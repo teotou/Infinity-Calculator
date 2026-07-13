@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rage Calculator — Sword & Supper</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#a8c4dc;--bg-grad:#b8d0e4;
+    --panel:#f4ead0;--panel-dark:#1c2e42;--panel-mid:#2a3e58;
+    --text:#0a1a2c;--text-dim:#5a6878;
+    --text-light:#ffffff;--text-light-dim:#a8bdd2;
+    --border:#cdb888;--border-dark:#1c2e42;
+    --accent:#f4b830;--accent-light:#ffd060;--accent-dark:#d49c20;
+    --pill-bg:#1c2e42;--pill-text:#ffffff;
+    --c-rage:#e8552c;--c-lightning:#f0c520;--c-knife:#a050e0;--c-heal:#3ec070;--c-shield:#9aabbc;--c-atk:#e88838;
+    --shadow:0 2px 8px rgba(28,46,66,0.12);--shadow-lg:0 4px 14px rgba(28,46,66,0.18);
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:linear-gradient(180deg,var(--bg) 0%,var(--bg-grad) 100%);color:var(--text);font-family:'Inter',system-ui,sans-serif;min-height:100vh;padding:1rem .8rem 3rem;-webkit-font-smoothing:antialiased}
+  .container{max-width:960px;margin:0 auto}
+  header{text-align:center;margin-bottom:1.2rem;padding-bottom:.6rem}
+  h1{font-size:clamp(1.5rem,5vw,2.4rem);color:var(--panel-dark);font-weight:800;letter-spacing:-0.02em}
+  .sub{font-size:.88rem;color:var(--text);opacity:.65;margin-top:.2rem;font-weight:500}
+
+  /* Panel */
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:1rem 1.1rem;margin-bottom:.8rem;box-shadow:var(--shadow);position:relative}
+  .panel.dark{background:var(--panel-dark);border-color:var(--panel-dark);color:var(--text-light)}
+
+  /* Section label */
+  .sl{font-size:.65rem;letter-spacing:.18em;text-transform:uppercase;color:var(--panel-dark);font-weight:800;margin-bottom:.5rem;display:flex;align-items:center;gap:.4rem}
+  .sl.dim{color:var(--text-dim);font-weight:700}
+  .panel.dark .sl{color:var(--text-light)}
+
+  /* Forms */
+  input,select{background:#fff;border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'Inter',sans-serif;font-size:.88rem;padding:.45rem .65rem;outline:none;width:100%;font-weight:500;transition:border-color .15s}
+  input:focus,select:focus{border-color:var(--panel-dark)}
+  select option{background:#fff;color:var(--text)}
+  select option:disabled{color:var(--accent-dark);font-weight:700;background:#f5e9c5;letter-spacing:.06em}
+  .fl{font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin-bottom:.2rem;font-weight:700}
+
+  /* Buttons */
+  .btn{font-family:'Inter',sans-serif;font-size:.78rem;letter-spacing:.04em;font-weight:700;cursor:pointer;border-radius:999px;padding:.55rem 1.1rem;border:none;transition:all .15s;white-space:nowrap}
+  .btn-gold{background:var(--accent);color:var(--panel-dark);border:1.5px solid var(--accent-dark)}
+  .btn-gold:hover{background:var(--accent-light);box-shadow:0 2px 8px rgba(244,184,48,0.4);transform:translateY(-1px)}
+  .btn-primary{background:var(--pill-bg);color:var(--pill-text);border:1.5px solid var(--panel-dark)}
+  .btn-primary:hover{background:var(--panel-mid)}
+  .btn-rm{background:transparent;color:#c44a30;border:1.5px solid rgba(196,74,48,0.3);font-size:.62rem;padding:.18rem .45rem;cursor:pointer;border-radius:6px;font-weight:600}
+  .btn-rm:hover{background:rgba(196,74,48,0.1);border-color:#c44a30}
+
+  /* Icons - colored circular badges */
+  .ico{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:800;vertical-align:middle;flex-shrink:0;line-height:1;font-family:'Inter',sans-serif;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+  .ico-sm{width:18px;height:18px;font-size:9px}
+  .ico-sm[class*="knife"]{font-size:8px;letter-spacing:-0.5px}
+  .ico-mk{font-size:9px;letter-spacing:-0.5px}
+  .ico-rage{background:linear-gradient(135deg,#e8552c,#d63818);color:#fff}
+  .ico-lightning{background:linear-gradient(135deg,#f0c520,#e8a418);color:#fff}
+  .ico-knife{background:linear-gradient(135deg,#a050e0,#7530b8);color:#fff}
+  .ico-heal{background:linear-gradient(135deg,#3ec070,#208848);color:#fff}
+  .ico-shield{background:linear-gradient(135deg,#c8d5e0,#8898a8);color:#fff}
+  .ico-atk{background:linear-gradient(135deg,#e88838,#c86818);color:#fff}
+  .ico-def{background:#cccccc;color:#fff}
+
+  /* Gear grid */
+  .gear-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.6rem}
+  .slot{background:#fdf8e8;border:1.5px solid var(--border);border-radius:10px;padding:.7rem .85rem;transition:border-color .15s}
+  .slot:hover{border-color:var(--accent-dark)}
+  .slot-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.45rem}
+  .sn{font-size:.66rem;letter-spacing:.14em;color:var(--panel-dark);text-transform:uppercase;font-weight:800}
+  .lock-label{display:flex;align-items:center;gap:.3rem;font-size:.7rem;color:var(--text-dim);cursor:pointer;user-select:none;font-weight:600}
+  .lock-label input{width:auto;accent-color:var(--panel-dark)}
+  .seq{font-size:.92rem;color:var(--text);margin-bottom:.25rem;font-weight:600}
+  .sea{font-size:.72rem;display:flex;flex-wrap:wrap;gap:.3rem;align-items:center}
+  .sen{font-size:.82rem;color:var(--text-dim);opacity:.5;font-style:italic}
+  .ability-tag{display:inline-flex;align-items:center;gap:5px;background:var(--panel-dark);color:var(--text-light);border-radius:999px;padding:3px 10px 3px 4px;font-size:.7rem;font-weight:500}
+
+  /* Shrine */
+  .shrine-planner{background:#fdf8e8;border:1.5px solid var(--border);border-radius:10px;padding:.5rem .65rem;margin-bottom:.4rem}
+  .shrine-bubble{background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:.25rem .4rem}
+
+  /* Stats grid - dark navy pills like HP/DEF in reference */
+  .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:.4rem;margin:.7rem 0}
+  .stat-box{background:var(--panel-dark);border-radius:10px;padding:.6rem .4rem;text-align:center;color:var(--text-light)}
+  .sv{font-size:1.4rem;line-height:1.1;color:var(--text-light);font-weight:800}
+  .sla{font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--text-light-dim);margin-top:.2rem;font-weight:600}
+
+  /* Turn rows */
+  .turn-row{display:grid;grid-template-columns:48px 1fr auto;align-items:center;gap:.5rem;padding:.45rem .65rem;background:#fdf8e8;border:1.5px solid var(--border);border-radius:8px;margin-bottom:.3rem;font-size:.83rem}
+  .turn-row.has-rage{background:linear-gradient(90deg,#fde8c8,#fdf8e8);border-color:var(--accent-dark)}
+  .tl{font-size:.7rem;color:var(--panel-dark);text-transform:uppercase;font-weight:800}
+  .tb{height:16px;background:rgba(28,46,66,0.1);border-radius:8px;overflow:hidden;position:relative}
+  .tbf{height:100%;background:linear-gradient(90deg,#e85540,#f4b830);border-radius:8px}
+  .tbt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.62rem;color:var(--panel-dark);font-weight:700}
+  .badge{font-size:.6rem;letter-spacing:.04em;padding:.22rem .5rem;border-radius:999px;background:var(--panel-dark);color:var(--text-light);text-transform:uppercase;white-space:nowrap;font-weight:700}
+  .badge.none{background:rgba(28,46,66,0.15);color:var(--text-dim)}
+
+  /* Chain log */
+  .chain-log{background:var(--panel-dark);color:var(--text-light);border-radius:10px;padding:.6rem .85rem;max-height:240px;overflow-y:auto;font-size:.82rem;transition:max-height .3s ease,padding .3s ease,opacity .3s ease}
+  .chain-log.collapsed{max-height:0;padding:0 .85rem;overflow:hidden;opacity:.3}
+  .collapsible-content{transition:max-height .3s ease,opacity .3s ease,margin .3s ease;max-height:2000px;overflow:hidden}
+  .collapsible-content.collapsed{max-height:0;opacity:.2;margin:0;overflow:hidden}
+  .collapsible-header{cursor:pointer}
+  .collapsible-header:hover{color:var(--accent-dark)}
+  .caret{display:inline-block;transition:transform .2s;font-size:.7rem;margin-left:.3rem;opacity:.6}
+  .caret.open{transform:rotate(90deg)}
+  .cs{padding:.18rem 0;display:flex;justify-content:space-between;gap:.4rem;align-items:center}
+  .cs .rd{color:var(--c-lightning);font-size:.74rem;font-weight:700}
+  .cd{text-align:center;font-size:.6rem;letter-spacing:.1em;color:var(--text-light-dim);opacity:.8;padding:.3rem 0;text-transform:uppercase;font-weight:700}
+  .cre{color:var(--accent-light);font-weight:700;background:rgba(244,184,48,0.15);padding:.18rem .4rem;margin:.1rem -.4rem;border-radius:4px}
+
+  /* Misc */
+  .empty{text-align:center;padding:.8rem;color:var(--text-dim);font-style:italic;opacity:.6;font-size:.85rem}
+  .opt-item{display:grid;grid-template-columns:55px 1fr;gap:.45rem;align-items:center;padding:.35rem .55rem;background:#fdf8e8;border:1px solid var(--border);border-radius:8px;font-size:.85rem;margin-bottom:.2rem}
+  .os{font-size:.58rem;letter-spacing:.1em;color:var(--panel-dark);text-transform:uppercase;font-weight:800}
+
+  @media(max-width:560px){.gear-grid{grid-template-columns:1fr}.shrine-opts{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+<header><h1>Rage Calculator</h1><div class="sub">Sword &amp; Supper · Gear + Vending Machine Optimizer</div></header>
+
+<!-- GEAR -->
+<div class="panel">
+  <div class="sl">Equipped Gear</div>
+  <div class="gear-grid" id="gearGrid"></div>
+</div>
+
+<!-- COMBAT SIM + OPTIMIZER (merged) -->
+<div class="panel" style="border-color:var(--accent-dark);border-width:2px">
+  <div class="sl" style="margin-bottom:.5rem">Combat Simulation</div>
+  <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem">
+
+
+    <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.78rem;color:var(--text-dim);font-weight:600"><input type="checkbox" id="noviceMode" onchange="simulate()" style="width:auto;accent-color:var(--c-knife)"> Novice items</label>
+    <button class="btn btn-gold" onclick="optimize()" style="margin-left:auto">⚔ Find Best Build</button>
+  </div>
+  <div id="optResult" style="margin-bottom:.4rem;"></div>
+  <div class="stats-grid" id="simStats"></div>
+  <div class="sl collapsible-header" onclick="document.getElementById('simProj').classList.toggle('collapsed');this.querySelector('.caret').classList.toggle('open')" style="margin-top:.5rem;cursor:pointer">Turn-by-Turn <span class="caret open">▸</span></div>
+  <div id="simProj" class="collapsible-content"></div>
+  <div class="sl collapsible-header" style="margin-top:.5rem;cursor:pointer" onclick="document.getElementById('simBuild').classList.toggle('collapsed');this.querySelector('.caret').classList.toggle('open')">Build Details <span class="caret open">▸</span></div>
+  <div id="simBuild" class="collapsible-content"></div>
+  <div class="sl collapsible-header" style="margin-top:.5rem;cursor:pointer" onclick="document.getElementById('simLog').classList.toggle('collapsed');this.querySelector('.caret').classList.toggle('open')">Turn 1 Chain Trace <span class="caret">▸</span></div>
+  <div class="chain-log collapsible-content collapsed" id="simLog"><div class="empty">Equip gear to see simulation</div></div>
+</div>
+
+<!-- VENDING MACHINE PLANNER -->
+<div class="panel">
+  <div class="sl">Vending Machines</div>
+  <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;">
+    <div style="font-size:.8rem;color:var(--text-dim);font-weight:500;">9 vending machines · 3 abilities each — optimizer picks the best one.</div>
+    <button class="btn btn-primary" onclick="document.getElementById('shrineImportBox').style.display=document.getElementById('shrineImportBox').style.display==='none'?'block':'none'" style="margin-left:auto;font-size:.72rem;padding:.35rem .8rem">📋 Import</button>
+  </div>
+  <div id="shrineImportBox" style="display:none;margin-bottom:.6rem;background:#f4e8f8;border:1.5px solid var(--c-knife);border-radius:10px;padding:.7rem .85rem">
+    <div style="font-size:.75rem;font-weight:700;color:var(--c-knife);margin-bottom:.35rem">Paste your vending machine list (M1: ..., M2: ...) and click Import</div>
+    <textarea id="shrineImportText" placeholder="M1: Floor 6(2 for 2 L, H on 1st turn, strike twice every other)&#10;M2: Floor 30(R on L, Attack in high hp, crit up low hp)&#10;..." style="width:100%;height:110px;font-size:.78rem;border-radius:6px;border:1.5px solid var(--c-knife);padding:.4rem;font-family:monospace;resize:vertical"></textarea>
+    <div style="display:flex;gap:.5rem;margin-top:.4rem;align-items:center">
+      <button class="btn btn-gold" onclick="importShrines()" style="font-size:.78rem">⚡ Parse & Import</button>
+      <span id="shrineImportMsg" style="font-size:.75rem;color:var(--text-dim)"></span>
+    </div>
+  </div>
+  <div id="shrinePlanner"></div>
+</div>
+</div>
+
+<script>
+const MAX_RAGE=100,BASE_RAGE=25;
+const SLOTS=[{id:'helm',name:'Helm',icon:'🪖'},{id:'chest',name:'Chest',icon:'🛡'},{id:'neck',name:'Neck',icon:'🔱'},{id:'weapon',name:'Weapon',icon:'⚔'},{id:'ring',name:'Ring',icon:'💍'},{id:'belt',name:'Belt',icon:'👑'}];
+
+const ABILITIES=[
+  {key:'rage_on_heal',name:'R on H',trigger:'heal',effect:'rage',defR:10},
+  {key:'rage_on_hit_5',name:'R on hit 5',trigger:'hit',effect:'rage',defR:10,hitN:5},
+  {key:'rage_on_lightning',name:'R on L',trigger:'lightning',effect:'rage',defR:10},
+  {key:'rage_on_magic_knife',name:'R on mK',trigger:'magic_knife',effect:'rage',defR:5},
+  {key:'bonus_rage_on_attack',name:'+R on atk',trigger:'passive',effect:'extra_base_rage',defR:10},
+  {key:'rage_on_first_turn',name:'R on 1st turn',trigger:'first_turn',effect:'rage',defR:50},
+  {key:'rage_on_kill',name:'R on kill',trigger:'kill',effect:'rage',defR:20},
+  {key:'every_other_add_rage',name:'R every other turn',trigger:'turn_count',effect:'rage',defR:10,turnN:2},
+  {key:'bolt_on_rage',name:'L on R',trigger:'rage',effect:'lightning'},
+  {key:'lightning_on_attack',name:'L on atk',trigger:'attack',effect:'lightning'},
+  {key:'lightning_every_5_hits',name:'L every 5 hits',trigger:'hit',effect:'lightning',hitN:5,every:true},
+  {key:'lightning_on_hit_4',name:'L on hit 4',trigger:'hit',effect:'lightning',hitN:4},
+  {key:'lightning_on_kill',name:'L on kill',trigger:'kill',effect:'lightning'},
+  {key:'lightning_on_turn_start',name:'L on turn start',trigger:'turn_start',effect:'lightning'},
+  {key:'two_for_two_lightning',name:'2 for 2 L',trigger:'turn_start',effect:'lightning',onlyTurn:2,effCount:2},
+  {key:'lightning_on_shield',name:'L on S',trigger:'shield',effect:'lightning'},
+  {key:'magic_knife_on_attack',name:'mK on atk',trigger:'attack',effect:'magic_knife'},
+  {key:'magic_knife_on_rage',name:'mK on R',trigger:'rage',effect:'magic_knife'},
+  {key:'magic_knife_every_3_turns',name:'mK every 3 turns',trigger:'turn_count',effect:'magic_knife',turnN:3},
+  {key:'magic_knife_on_hit_2',name:'mK on hit 2',trigger:'hit',effect:'magic_knife',hitN:2},
+  {key:'magic_knife_on_kill',name:'mK on kill',trigger:'kill',effect:'magic_knife'},
+  {key:'heal_on_lightning',name:'H on L',trigger:'lightning',effect:'heal'},
+  {key:'heal_on_magic_knife',name:'H on mK',trigger:'magic_knife',effect:'heal'},
+  {key:'heal_on_rage',name:'H on R',trigger:'rage',effect:'heal'},
+  {key:'heal_on_first_turn',name:'H on 1st turn',trigger:'first_turn',effect:'heal'},
+  {key:'heal_on_kill',name:'H on kill',trigger:'kill',effect:'heal'},
+  {key:'heal_on_hit_3',name:'H on hit 3',trigger:'hit',effect:'heal',hitN:3},
+  {key:'shield_on_kill',name:'S on kill',trigger:'kill',effect:'shield'},
+  {key:'shield_on_hit_5',name:'S on hit 5',trigger:'hit',effect:'shield',hitN:5},
+  {key:'shield_on_turn_4',name:'S on turn 4',trigger:'turn_count',effect:'shield',turnN:4},
+  {key:'shield_on_rage',name:'S on R',trigger:'rage',effect:'shield'},
+  {key:'shield_if_low',name:'S if low',trigger:'passive',effect:'none',noImpact:true},
+  {key:'crit_up_max_hp',name:'Crit up if max HP',trigger:'passive',effect:'none',noImpact:true},
+  {key:'critical_recovery',name:'Critical recovery',trigger:'passive',effect:'none',noImpact:true},
+  {key:'low_hp_defence',name:'Low HP def boost',trigger:'passive',effect:'none',noImpact:true},
+  {key:'second_wind',name:'Second wind',trigger:'passive',effect:'none',noImpact:true},
+  {key:'fill_rage_low_hp',name:'Fill R on low HP',trigger:'passive',effect:'none',noImpact:true},
+  {key:'magic_knife_on_turn_start',name:'mK on turn start',trigger:'turn_start',effect:'magic_knife'},
+  {key:'poison_cleanse',name:'Poison cleanse',trigger:'passive',effect:'none',noImpact:true},
+  {key:'life_steal',name:'Life steal on atk',trigger:'attack',effect:'heal'},
+  // Gear-only abilities (not available as shrine options)
+  {key:'knife_doubler',name:'Knife doubler',trigger:'passive',effect:'knife_doubler'},
+  {key:'strike_twice',name:'Strike twice',trigger:'passive',effect:'strike_twice'},
+  {key:'heal_every_2_hits',name:'H every 2 hits',trigger:'hit',effect:'heal',hitN:2,every:true},
+  {key:'magic_knife_every_3_hits',name:'mK every 3 hits',trigger:'hit',effect:'magic_knife',hitN:3,every:true},
+];
+const AB=Object.fromEntries(ABILITIES.map(a=>[a.key,a]));
+
+const ITEM_DB={
+  helm:[
+    {name:'— No Helm —',abs:[]},
+    {name:'Wrathful Visor',abs:[{k:'rage_on_heal',r:10}]},
+    {name:'Braveheart Helm',abs:[{k:'heal_on_rage'}]},
+    {name:'Storm Helm',abs:[{k:'heal_on_lightning'}]},
+    {name:'Spiked Cowl',abs:[{k:'heal_on_magic_knife'}]},
+    {name:'Arctic Mantle',abs:[{k:'magic_knife_on_attack'}]},
+  ],
+  chest:[
+    {name:'— No Chest —',abs:[]},
+    {name:'Power Vest',abs:[{k:'rage_on_first_turn',r:50}]},
+    {name:'Conductive Chestplate',abs:[{k:'heal_on_lightning'},{k:'rage_on_lightning',r:10}]},
+    {name:'Battlethirsty Vest',abs:[{k:'rage_on_kill',r:20},{k:'heal_on_rage'}]},
+    {name:'Darksteel Plate',abs:[{k:'rage_on_magic_knife',r:5}]},
+    {name:'Recovery Vest',abs:[{k:'heal_on_magic_knife'}]},
+    {name:'Fury Vest',abs:[{k:'bonus_rage_on_attack',r:10}]},
+  ],
+  neck:[
+    {name:'— No Amulet —',abs:[]},
+    {name:'Wizard Sigil',abs:[{k:'bolt_on_rage'}]},
+    {name:'Raging Charm',abs:[{k:'heal_on_rage'}]},
+    {name:'Deadly Relic',abs:[{k:'heal_on_kill'}]},
+    {name:'Ember Droplet',abs:[{k:'magic_knife_on_turn_start'}]},
+  ],
+  weapon:[
+    {name:'— No Weapon —',abs:[]},
+    {name:'Vectra Edge',abs:[{k:'lightning_on_attack'},{k:'rage_on_lightning',r:10}]},
+    {name:"Sower's Lament",abs:[{k:'magic_knife_on_attack'},{k:'shield_on_hit_5'}]},
+    {name:'Scarsteel',abs:[{k:'bolt_on_rage'}]},
+    {name:'Cursed Naginata',abs:[{k:'heal_every_2_hits'}]},
+    {name:'Stone Blade',abs:[{k:'magic_knife_on_rage'}]},
+    {name:'Cursed Naginata',abs:[{k:'heal_every_2_hits'}]},
+  ],
+  ring:[
+    {name:'— No Ring —',abs:[]},
+    {name:'Inferno Ring',abs:[{k:'rage_on_first_turn',r:50}]},
+    {name:'Smiting Ring',abs:[{k:'lightning_on_attack'}]},
+    {name:'Ruby Clawed Ring',abs:[{k:'magic_knife_on_rage'}]},
+    {name:'Amberfire Ring',abs:[{k:'magic_knife_on_attack'}]},
+    {name:'Stacked Signet',abs:[{k:'rage_on_hit_5',r:25}]},
+  ],
+  belt:[
+    {name:'— No Belt —',abs:[]},
+    {name:'Seething Sash',abs:[{k:'bonus_rage_on_attack',r:10},{k:'rage_on_first_turn',r:50}]},
+    {name:'Stormwrath Belt',abs:[{k:'lightning_on_turn_start'},{k:'lightning_on_kill'}]},
+    {name:'Volatile Sash',abs:[{k:'rage_on_heal',r:10}]},
+    {name:"Knife Collector's Belt",abs:[{k:'knife_doubler'}]},
+    {name:'Stealthslicer Belt',abs:[{k:'magic_knife_every_3_hits'}]},
+  ],
+};
+
+// State
+let equipped={};SLOTS.forEach(s=>equipped[s.id]=null);
+let locked={};SLOTS.forEach(s=>locked[s.id]=false);
+let shrinePlan=[];
+
+// Icon helpers
+function icoFor(eff){
+  if(eff==='rage'||eff==='extra_base_rage')return'<span class="ico ico-rage">R</span>';
+  if(eff==='lightning')return'<span class="ico ico-lightning">L</span>';
+  if(eff==='magic_knife'||eff==='knife_doubler')return'<span class="ico ico-knife ico-mk">MK</span>';
+  if(eff==='heal')return'<span class="ico ico-heal">+</span>';
+  if(eff==='shield')return'<span class="ico ico-shield"><svg viewBox="0 0 12 14" width="11" height="13" fill="white"><path d="M6 .5L.5 3v4c0 3.3 2.3 5.5 5.5 6.5 3.2-1 5.5-3.2 5.5-6.5V3z"/></svg></span>';
+  if(eff==='strike_twice'||eff==='triple_attack')return'<span class="ico ico-atk"><svg viewBox="0 0 14 14" width="11" height="11" fill="white"><path d="M7 1L2 6l2 1-3 6 6-4 1 2L13 1z"/></svg></span>';
+  return'<span class="ico ico-def">·</span>';
+}
+function trigIco(trigger,a){
+  if(trigger==='attack')return'<span style="font-size:14px;vertical-align:middle">⚔️</span>';
+  if(trigger==='lightning')return'<span class="ico ico-lightning ico-sm">L</span>';
+  if(trigger==='magic_knife')return'<span class="ico ico-knife ico-sm">MK</span>';
+  if(trigger==='heal')return'<span class="ico ico-heal ico-sm">+</span>';
+  if(trigger==='rage')return'<span class="ico ico-rage ico-sm">R</span>';
+  if(trigger==='kill')return'💀';
+  if(trigger==='first_turn')return'T1';
+  if(trigger==='turn_start')return'each turn';
+  if(trigger==='hit')return`${a.hitN||'?'} hits`;
+  if(trigger==='turn_count')return`${a.turnN||'?'} turns`;
+  if(trigger==='passive')return'passive';
+  return trigger;
+}
+function descAb(a){
+  const t=AB[a.k];if(!t)return'';
+  const val=t.effect==='rage'||t.effect==='extra_base_rage'?`+${a.r||t.defR} `:'';
+  const effIco=icoFor(t.effect).replace(/width="24" height="24"/g,'').replace(/width:24px;height:24px/g,'');
+  const trig=trigIco(t.trigger,{hitN:a.hitN||t.hitN,turnN:a.turnN||t.turnN});
+  return`<span class="ability-tag">${effIco}<span>${val}on ${trig}</span></span>`;
+}
+function descItem(item){return item.abs.map(descAb).join(' ');}
+
+function descAbText(a){
+  const t=AB[a.k];if(!t)return'';
+  const val=(t.effect==='rage'||t.effect==='extra_base_rage')?`+${a.r||t.defR} `:'';
+  // Use the ability's short name wrapped in brackets to stand out
+  return`[${val}${t.name}]`;
+}
+function descItemText(item){return item.abs.map(descAbText).join(' ');}
+
+// Novice item overrides — lower values for new players
+const NOVICE_OVERRIDES={
+  'Power Vest':        [{k:'rage_on_first_turn',r:35}],
+  'Inferno Ring':      [{k:'rage_on_first_turn',r:30}],
+  'Seething Sash':     [{k:'bonus_rage_on_attack',r:10},{k:'rage_on_first_turn',r:30}],
+};
+
+function getNoviceMode(){return document.getElementById('noviceMode')?.checked||false;}
+
+function getItemAbs(item){
+  if(getNoviceMode()&&NOVICE_OVERRIDES[item.name])return NOVICE_OVERRIDES[item.name];
+  return item.abs;
+}
+function expandAbs(absList){
+  return absList.map(a=>{const t=AB[a.k];if(!t)return null;return{name:t.name,trigger:t.trigger,effect:t.effect,rageAmt:a.r||t.defR,hitN:a.hitN||t.hitN,turnN:a.turnN||t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact};}).filter(Boolean);
+}
+function getActiveAbilities(){
+  const list=[];
+  SLOTS.forEach(s=>{
+    const n=equipped[s.id];if(!n)return;
+    const item=ITEM_DB[s.id].find(i=>i.name===n);if(!item)return;
+    list.push(...expandAbs(getItemAbs(item)));
+  });
+  shrinePlan.forEach((shrine,i)=>{
+    const sel=document.getElementById('shrineChoice'+i);
+    if(!sel||!sel.value)return;
+    const t=AB[sel.value];if(!t)return;
+    list.push({name:t.name+' (vending)',trigger:t.trigger,effect:t.effect,rageAmt:t.defR,hitN:t.hitN,turnN:t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact});
+  });
+  return list;
+}
+
+// ======== RENDER ========
+function render(){renderGear();renderShrinePlanner();simulate();}
+
+function renderGear(){
+  document.getElementById('gearGrid').innerHTML=SLOTS.map(s=>{
+    const items=ITEM_DB[s.id]||[];const eq=equipped[s.id];const lk=locked[s.id];
+    const eqItem=eq?items.find(i=>i.name===eq):null;
+    return`<div class="slot" style="${lk?'border-color:var(--accent-dark);border-width:2px;background:#fff3d0;':''}">
+      <div class="slot-top">
+        <span class="sn">${s.icon} ${s.name}</span>
+        <label class="lock-label"><input type="checkbox" ${lk?'checked':''} onchange="toggleLock('${s.id}',this.checked)"> 🔒 Lock</label>
+      </div>
+      ${eqItem?``:``}
+      <select onchange="equipItem('${s.id}',this.value)" style="margin-top:.3rem;font-size:.78rem;">
+        <option value="">— Select —</option>
+        ${items.map(i=>`<option value="${i.name}"${eq===i.name?' selected':''}>${i.name}  ·  ${descItemText(i)}</option>`).join('')}
+      </select>
+    </div>`;
+  }).join('');
+}
+
+function equipItem(sid,name){equipped[sid]=name||null;render();}
+function toggleLock(sid,val){locked[sid]=val;renderGear();}
+
+function renderShrinePlanner(){
+  const count=9;
+  while(shrinePlan.length<count)shrinePlan.push({opts:['','','']});
+  while(shrinePlan.length>count)shrinePlan.pop();
+  const div=document.getElementById('shrinePlanner');
+  const excluded=new Set(['magic_knife_every_3_turns','shield_on_turn_4','crit_up_max_hp','critical_recovery','low_hp_defence','second_wind','fill_rage_low_hp','magic_knife_on_crit','knife_doubler','strike_twice','heal_every_2_hits','every_other_add_rage','two_for_two_lightning']);
+  // Group abilities by effect category
+  const groups=[
+    {label:'💢 Rage',keys:['rage_on_heal','rage_on_hit_5','rage_on_lightning','rage_on_magic_knife','bonus_rage_on_attack','rage_on_first_turn','rage_on_kill','every_other_add_rage']},
+    {label:'⚡ Lightning',keys:['bolt_on_rage','lightning_on_attack','lightning_every_5_hits','lightning_on_hit_4','lightning_on_kill','lightning_on_turn_start','two_for_two_lightning','lightning_on_shield']},
+    {label:'🔪 Magic Knife',keys:['magic_knife_on_attack','magic_knife_on_rage','magic_knife_on_hit_2','magic_knife_on_kill']},
+    {label:'💚 Heal',keys:['heal_on_lightning','heal_on_magic_knife','heal_on_rage','heal_on_first_turn','heal_on_kill','heal_on_hit_3']},
+    {label:'🛡 Shield',keys:['shield_on_kill','shield_on_hit_5','shield_on_rage','shield_if_low']},
+    {label:'⚙ Other',keys:['life_steal']},
+  ];
+  const abOpts=groups.map(g=>{
+    const opts=g.keys.filter(k=>!excluded.has(k)&&AB[k]).map(k=>`<option value="${k}">　 ${AB[k].name}</option>`).join('');
+    return opts?`<option disabled>━━━ ${g.label} ━━━</option>${opts}`:'';
+  }).join('');
+  div.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">${shrinePlan.map((shrine,i)=>{
+    const chosen=document.getElementById('shrineChoice'+i);const chosenVal=chosen?chosen.value:'';
+    const opts=[0,1,2].map(j=>`<select id="shrineOpt${i}_${j}" onchange="updateShrineOpt(${i},${j},this.value)" style="font-size:.72rem;padding:.25rem .35rem;margin-bottom:.2rem;width:100%"><option value="">— option —</option>${abOpts}</select>`).join('');
+    const pick=`<select id="shrineChoice${i}" onchange="simulate()" style="font-size:.72rem;padding:.25rem .35rem;width:100%;border-color:var(--c-knife);color:var(--c-knife);font-weight:600">
+      <option value="">— Auto —</option>
+      ${[0,1,2].map(j=>{const k=shrine.opts[j];const t=AB[k];return k?`<option value="${k}"${chosenVal===k?' selected':''}>${t?t.name:k}</option>`:'';}).join('')}
+    </select>`;
+    return`<div class="shrine-planner">
+      <div style="font-size:.65rem;color:var(--c-knife);letter-spacing:.12em;font-weight:800;text-transform:uppercase;margin-bottom:.35rem">🎰 Vending Machine ${i+1}</div>
+      ${opts}${pick}
+    </div>`;
+  }).join('')}</div>`;
+  shrinePlan.forEach((shrine,i)=>{[0,1,2].forEach(j=>{const sel=document.getElementById('shrineOpt'+i+'_'+j);if(sel&&shrine.opts[j])sel.value=shrine.opts[j];});});
+}
+function updateShrineOpt(i,j,val){
+  shrinePlan[i].opts[j]=val;
+  const choiceSel=document.getElementById('shrineChoice'+i);
+  if(choiceSel){const prev=choiceSel.value;const opts=shrinePlan[i].opts.filter(Boolean);choiceSel.innerHTML='<option value="">— Auto —</option>'+opts.map(k=>{const t=AB[k];return`<option value="${k}"${prev===k?' selected':''}>${t?t.name:k}</option>`;}).join('');}
+  simulate();
+}
+
+// ======== SIMULATION ========
+function simTurn(startRage,abs,turnNum,startEHp,enemies,shields,dodgeFirstAtk,enemyMaxHp,ignoreKills,isAOE){
+  const byT={attack:[],lightning:[],magic_knife:[],heal:[],rage:[],turn_start:[],first_turn:[],kill:[],hit:[],turn_count:[],shield:[],passive:[]};
+  abs.forEach(a=>{if(byT[a.trigger])byT[a.trigger].push(a);});
+  let baseR=BASE_RAGE,numBasics=1,knifeDouble=false;
+  byT.passive.forEach(a=>{
+    if(a.effect==='extra_base_rage')baseR+=a.rageAmt;
+    if(a.effect==='strike_twice'&&turnNum%2===0)numBasics=2;
+    if(a.effect==='knife_doubler')knifeDouble=true;
+  });
+  let rage=startRage,eHp=startEHp,eLeft=enemies,sh=shields;
+  let ra=0,kills=0,shGained=0,hitCount=0,totalR=0;
+  let log=[],steps=0;const SAFETY=1200;
+  const maxHp=enemyMaxHp||100;
+  const aoeDmgPerRA=Math.floor(maxHp*0.5);
+  let aoeDmgDealt=0; // cumulative AOE damage dealt to all enemies
+
+  function dmg(amt){if(eLeft<=0)return;eHp-=amt;while(eHp<=0&&eLeft>0){kills++;eLeft--;log.push({t:'header',a:`💀 Kill (${eLeft} left)`});if(!ignoreKills)byT.kill.forEach(eff);if(eLeft>0)eHp=maxHp;}}
+  function dmgAOE(amt){
+    if(eLeft<=0)return;
+    aoeDmgDealt+=amt;
+    eHp-=amt;
+    while(eHp<=0&&eLeft>0){
+      kills++;eLeft--;
+      log.push({t:'header',a:`💀 AOE Kill (${eLeft} left)`});
+      if(!ignoreKills)byT.kill.forEach(eff);
+      if(eLeft>0)eHp=maxHp-aoeDmgDealt; // next enemy already took prior AOE hits
+    }
+  }
+  const firedOnce=new Set();
+  function regHit(){
+    hitCount++;
+    byT.hit.forEach(a=>{
+      const n=a.hitN||5;
+      if(a.every){
+        if(hitCount%n===0)eff(a);
+      }else{
+        if(hitCount===n&&!firedOnce.has(a))firedOnce.add(a),eff(a);
+      }
+    });
+  }
+  function addR(amt,src){if(steps++>SAFETY)return;const b=rage;rage+=amt;totalR+=Math.max(0,amt);log.push({t:'rage',a:src,d:amt,r:rage});if(b<100&&rage>=100)doRA();}
+  function eff(a){
+    if(steps++>SAFETY||a.noImpact)return;
+    if(a.effect==='rage')addR(a.rageAmt,a.name);
+    else if(a.effect==='lightning'){regHit();log.push({t:'event',a:`⚡ ${a.name}`});byT.lightning.forEach(eff);}
+    else if(a.effect==='magic_knife'){const times=knifeDouble?2:1;for(let mk=0;mk<times;mk++){regHit();log.push({t:'event',a:`🗡 ${a.name}${knifeDouble?' ×2':''}`});byT.magic_knife.forEach(eff);}}
+    else if(a.effect==='heal'){log.push({t:'event',a:`💚 ${a.name}`});byT.heal.forEach(eff);}
+    else if(a.effect==='shield'){shGained++;sh++;log.push({t:'event',a:`🛡 ${a.name}`});byT.shield.forEach(eff);}
+  }
+  function doRA(){rage-=100;ra++;log.push({t:'ra',a:`⚔ Rage Attack #${ra}${isAOE?' (AOE)':''}`,r:rage});if(isAOE)dmgAOE(aoeDmgPerRA);else dmg(100);byT.rage.forEach(eff);}
+
+  if(turnNum===1&&byT.first_turn.length){log.push({t:'header',a:'First Turn'});byT.first_turn.forEach(eff);}
+  if(byT.turn_start.length){
+    byT.turn_start.forEach(a=>{
+      if(a.onlyTurn&&turnNum!==a.onlyTurn)return;
+      const times=a.effCount||1;
+      log.push({t:'header',a:`Turn Start — ${a.name}${times>1?' ×'+times:''}`});
+      for(let i=0;i<times;i++)eff(a);
+    });
+  }
+  byT.turn_count.forEach(a=>{if(turnNum%(a.turnN||3)===0){log.push({t:'header',a:`Turn ${turnNum} trigger`});eff(a);}});
+  if(rage>=100)doRA();
+
+  for(let b=0;b<numBasics;b++){
+    const isDodged=dodgeFirstAtk&&turnNum===1&&b===0;
+    if(isDodged){
+      log.push({t:'header',a:`Basic Attack — DODGED! (0 dmg, but +${baseR} rage, on-attack fires)`});
+      regHit();addR(baseR,'Basic attack (dodged)');byT.attack.forEach(eff);
+    }else{
+      log.push({t:'header',a:`Basic Attack (+${baseR} rage, 40 dmg)`});
+      regHit();dmg(40);addR(baseR,'Basic attack');byT.attack.forEach(eff);
+    }
+  }
+  return{rage,eHp:eLeft>0?eHp:0,eLeft,sh,ra,kills,shGained,hitCount,totalR,log};
+}
+
+function simCombat(numE,startR,abs,dodgeFirst,rasPerKill,ignoreKills,oneShot,isAOE,optGoal){
+  const turns=[];const enemyMaxHp=100*(rasPerKill||1);
+  let rage=startR,enemies=numE,eHp=enemyMaxHp,pHp=100,shields=0;
+  for(let t=1;t<=30;t++){
+    if(enemies<=0||pHp<=0)break;
+    const dodge=dodgeFirst&&t===1;
+    const r=simTurn(rage,abs,t,eHp,enemies,shields,dodge,enemyMaxHp,ignoreKills,isAOE);
+    let dmgTk=0,blocked=0,endSh=r.sh,shieldWin=false;
+    if(r.eLeft>0){
+      const shieldGoal=optGoal==='clearShield';
+      if(oneShot||shieldGoal){
+        if(shieldGoal&&r.eLeft===1&&endSh>0){
+          // Shield absorbs the last hit — count as win, stop combat
+          endSh=0;blocked=1;shieldWin=true;
+        }else{
+          pHp=0;dmgTk=100;
+        }
+      }else if(endSh>0){
+        endSh=0;blocked=1;
+        for(let h=1;h<r.eLeft;h++){dmgTk+=35;}
+      }else{
+        for(let h=0;h<r.eLeft;h++){dmgTk+=35;}
+      }
+    }
+    pHp=Math.max(0,pHp-dmgTk);
+    turns.push({turn:t,startR:rage,endR:r.rage,ra:r.ra,kills:r.kills,totalR:r.totalR,shG:r.shGained,blocked,eLeft:shieldWin?0:r.eLeft,eHp:r.eHp,dmg:dmgTk,hp:pHp,sh:endSh,died:pHp<=0,shieldWin,log:t===1?r.log:null});
+    rage=r.rage;enemies=r.eLeft;eHp=r.eHp;shields=endSh;
+    if(pHp<=0||shieldWin)break;
+  }
+  return turns;
+}
+
+function scoreTurns(turns,optGoal){
+  const tRA=turns.reduce((s,t)=>s+t.ra,0),tS=turns.reduce((s,t)=>s+t.shG,0),tK=turns.reduce((s,t)=>s+t.kills,0);
+  const last=turns[turns.length-1]||{};const died=!!last.died,cleared=(last.eLeft||0)===0&&!died;
+  const shieldSurvive=!!last.shieldWin;
+  const win=cleared||shieldSurvive;
+  const fHp=died?0:(last.hp??100);
+  const t1RA=(turns[0]||{}).ra||0;
+  const avgRA=turns.length>0?tRA/turns.length:0;
+  if(optGoal==='maxRA'){
+    return t1RA*100000+Math.round(avgRA*10000)+tRA*100+(cleared?50000:0)+fHp;
+  }
+  if(optGoal==='twoRA'){
+    const t1Score=t1RA>=2?10000000+(t1RA*100000):t1RA*100000;
+    return t1Score+(cleared?50000:0)+tRA*100+fHp;
+  }
+  if(died)return-1000000+tRA*1000+tS;
+  if(win)return 10000000+tRA*1000+fHp*100+tS+(last.sh||0)*500;
+  return tK*100000+tRA*1000+fHp*100+tS;
+}
+
+// ======== SIMULATE & DISPLAY ========
+function simulate(){
+  const abs=getActiveAbilities();
+  const enemies=4;
+  const dodgeFirst=false;
+  const ignoreKills=true;
+  const oneShot=true;
+  const optGoal='maxRA';
+  const priority2RA=false;
+  const rasPerKill=1;
+  if(abs.length===0){document.getElementById('simStats').innerHTML='';document.getElementById('simProj').innerHTML='<div class="empty">Equip gear or add shrines</div>';document.getElementById('simLog').innerHTML='';return;}
+
+  const turns=simCombat(enemies,0,abs,dodgeFirst,rasPerKill,ignoreKills,oneShot,priority2RA,optGoal);
+  const tRA=turns.reduce((s,t)=>s+t.ra,0),tK=turns.reduce((s,t)=>s+t.kills,0),tRgen=turns.reduce((s,t)=>s+(t.totalR||0),0);
+  const last=turns[turns.length-1]||{};const died=!!last.died,cleared=(last.eLeft||0)===0&&!died;
+  const shieldSurvive=!!last.shieldWin;
+  const fHp=died?0:(last.hp??100);
+  let oc=died?'#e84030':(cleared||shieldSurvive)?'#3ec070':'#f0a838';
+  let ol=died?'☠ DIED':cleared?'✓ CLEARED':shieldSurvive?'🛡 SURVIVED':'⏱ ONGOING';
+
+  const t1RA=(turns[0]||{}).ra||0;
+  const isInfinite=t1RA>=3;
+  // Check if any of helm/neck/ring is empty (available for poison cleanse in CURRENT equipped)
+  const freeSlots=['helm','neck','ring'].filter(id=>{
+    const eq=equipped[id];
+    if(!eq)return true;
+    const item=ITEM_DB[id].find(i=>i.name===eq);
+    return item&&item.abs.length===0;
+  });
+  // If optimizer ran, also list slots that COULD be free while still infinite
+  const viable=window.__viablePoisonSlots||[];
+  const hasPoisonSlot=freeSlots.length>0||viable.length>0;
+  const slotLabel={helm:'Helm',neck:'Neck',ring:'Ring'};
+  let poisonText='✗ NO';
+  if(viable.length>0){
+    poisonText='✓ '+viable.map(s=>slotLabel[s]).join(', ');
+  }else if(freeSlots.length>0){
+    poisonText='✓ '+freeSlots.map(s=>slotLabel[s]).join(', ');
+  }
+
+  document.getElementById('simStats').innerHTML=`
+    <div class="stat-box" style="background:${isInfinite?'#e0f4e8':'#fde8e0'};border-color:${isInfinite?'#3ec070':'#e84030'}"><div class="sv" style="color:${isInfinite?'#3ec070':'#e84030'};font-size:1rem">${isInfinite?'✓ YES':'✗ NO'}</div><div class="sla" style="color:${isInfinite?'#3ec070':'#e84030'}">Infinite Rage</div></div>
+    <div class="stat-box" style="background:${hasPoisonSlot?'#e0f4e8':'#fde8e0'};border-color:${hasPoisonSlot?'#3ec070':'#e84030'}"><div class="sv" style="color:${hasPoisonSlot?'#3ec070':'#e84030'};font-size:1rem">${poisonText}</div><div class="sla" style="color:${hasPoisonSlot?'#3ec070':'#e84030'}">Poison Cleanse Slot</div></div>`;
+
+  let cumKills=0;
+  document.getElementById('simProj').innerHTML=turns.map(t=>{
+    const pct=Math.min(100,(t.endR/100)*100);
+    cumKills+=t.kills||0;
+    const hpColor=t.hp>50?'#3ec070':t.hp>20?'#f0a838':'#e84030';
+    const killBadge=t.kills>0?`<span style="font-size:.75rem;font-weight:700;color:#e84030">💀 Killed ${t.kills} → ${cumKills}/${enemies} total</span>`:'';
+    const hitBadge=t.dmg>0
+      ?`<span style="font-size:.75rem;font-weight:700;color:#e84030;background:#fde8e0;padding:2px 8px;border-radius:20px">⚠ Hit! −${t.dmg}% HP${t.blocked>0?` (🛡×${t.blocked} blocked)`:''}</span>`
+      :t.shieldWin?`<span style="font-size:.75rem;font-weight:700;color:#3ec070;background:#e0f4e8;padding:2px 8px;border-radius:20px">🛡 Shield absorbed last hit</span>`
+      :t.eLeft>0?'':`<span style="font-size:.75rem;font-weight:600;color:#3ec070">✓ No hit — all enemies dead</span>`;
+    const allDead=t.eLeft===0&&!t.died;
+    return`<div class="turn-row ${t.ra>0?'has-rage':''}" style="${t.died?'border-color:#e84030;background:#fde8e0;':allDead?'border-color:#3ec070;':''}">
+      <div class="tl">T${t.turn}<br><span style="color:var(--c-rage);font-size:.65rem">⚔${t.ra}RA</span></div>
+      <div>
+        <div class="tb" style="margin-bottom:.25rem"><div class="tbf" style="width:${pct}%"></div><div class="tbt">${t.startR}→+${t.totalR}→${t.endR}</div></div>
+        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
+          ${killBadge}
+          ${hitBadge}
+          <span style="font-size:.75rem;font-weight:700;color:${hpColor}">❤ ${t.hp}% HP</span>
+          ${t.eLeft>0&&!t.died?`<span style="font-size:.72rem;color:var(--text-dim)">${t.eLeft} enemies remaining</span>`:''}
+        </div>
+      </div>
+      <div></div>
+    </div>`;
+  }).join('');
+
+  // Build Details: show only active shrines
+  const buildDiv=document.getElementById('simBuild');
+  const activeShrines=shrinePlan.map((_,i)=>{const sel=document.getElementById('shrineChoice'+i);return sel&&sel.value?{idx:i,key:sel.value}:null;}).filter(Boolean);
+  if(activeShrines.length===0){
+    buildDiv.innerHTML='<div class="empty">No shrine abilities selected</div>';
+  }else{
+    buildDiv.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:.35rem;padding:.3rem 0">${
+      activeShrines.map(({key})=>{
+        const t=AB[key];if(!t)return'';
+        return`<span class="ability-tag" style="font-size:.68rem;padding:3px 9px 3px 4px">${icoFor(t.effect)}<span>${t.name.replace(' (vending)','')}</span></span>`;
+      }).join('')
+    }</div>`;
+  }
+
+  const t1log=turns[0]?turns[0].log:null;const logDiv=document.getElementById('simLog');
+  if(!t1log||!t1log.length){logDiv.innerHTML='<div class="empty">No events</div>';return;}
+  logDiv.innerHTML=t1log.map(e=>{
+    if(e.t==='header')return`<div class="cd">— ${e.a} —</div>`;
+    if(e.t==='rage')return`<div class="cs"><span>${e.a}</span><span class="rd">+${e.d}→${e.r}</span></div>`;
+    if(e.t==='event')return`<div class="cs"><span>${e.a}</span></div>`;
+    if(e.t==='ra')return`<div class="cs cre"><span>${e.a}</span><span class="rd">rage→${e.r}</span></div>`;
+    return'';
+  }).join('');
+}
+
+// ======== OPTIMIZER ========
+function optimize(){
+  // Reset all shrine "Your pick" dropdowns to auto so optimizer chooses freely
+  shrinePlan.forEach((_,i)=>{const sel=document.getElementById('shrineChoice'+i);if(sel)sel.value='';});
+  const enemies=4;
+  const dodgeFirst=false;
+  const ignoreKills=true;
+  const oneShot=true;
+  const optGoal='maxRA';
+  const priority2RA=false;
+  const rasPerKill=1;
+  const poisonMode=true; // always try
+  const resultDiv=document.getElementById('optResult');
+
+  // Two-pass strategy: try poison-cleanse first (empty helm/neck/ring), keep best.
+  // Then try without poison reservation. Use poison result if it's also infinite.
+  const poisonSlotsToTry = poisonMode ? ['helm','neck','ring',null] : [null];
+
+  let overallBest = {score:-Infinity, gear:null, shrineKeys:null, turns:null, forcedEmpty:null, perSlot:{}};
+
+  for(const forceEmpty of poisonSlotsToTry){
+    // Respect locked slots
+    const slotItems=SLOTS.map(s=>{
+      if(locked[s.id]&&equipped[s.id]){
+        const item=ITEM_DB[s.id].find(i=>i.name===equipped[s.id]);
+        return item?[item]:[null];
+      }
+      // If forcing this slot empty, only allow the No-X option
+      if(forceEmpty===s.id){
+        const empty=ITEM_DB[s.id].find(i=>i.abs.length===0);
+        return empty?[empty]:[null];
+      }
+      return ITEM_DB[s.id].length>0?ITEM_DB[s.id]:[null];
+    });
+
+    const shrineCombos=[];
+    function buildShrineCombos(idx,current){
+      if(idx>=shrinePlan.length){shrineCombos.push(current.slice());return;}
+      const shrine=shrinePlan[idx];
+      const manualChoice=document.getElementById('shrineChoice'+idx);
+      if(manualChoice&&manualChoice.value){current.push(manualChoice.value);buildShrineCombos(idx+1,current);current.pop();}
+      else{const opts=shrine.opts.filter(Boolean);if(opts.length===0){current.push(null);buildShrineCombos(idx+1,current);current.pop();}else{opts.forEach(k=>{current.push(k);buildShrineCombos(idx+1,current);current.pop();});}}
+    }
+    buildShrineCombos(0,[]);
+    if(shrineCombos.length===0)shrineCombos.push([]);
+
+    // Filter items by goal relevance
+    const isRageUseful=a=>{const t=AB[a.k];if(!t)return false;return!t.noImpact&&t.effect!=='none'&&t.effect!=='shield';};
+    const filteredSlotItems=slotItems.map((items,i)=>{
+      if(locked[SLOTS[i].id])return items;
+      if(optGoal==='maxRA'){
+        const useful=items.filter(it=>it.abs.length===0||getItemAbs(it).some(isRageUseful));
+        return useful.length>0?useful:items;
+      }
+      return items;
+    });
+
+    const shrineAbs=k=>{const t=AB[k];if(!t)return null;return{name:t.name+' (vending)',trigger:t.trigger,effect:t.effect,rageAmt:t.defR,hitN:t.hitN,turnN:t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact};};
+
+    let localBest={score:-Infinity,gear:null,shrineKeys:null,turns:null};
+    for(const shrineKeys of shrineCombos){
+      const sAbs=shrineKeys.filter(Boolean).map(shrineAbs).filter(Boolean);
+      function combine(idx,cur){
+        if(idx===SLOTS.length){
+          const gAbs=[];cur.forEach(it=>{if(!it)return;getItemAbs(it).forEach(a=>{const t=AB[a.k];if(!t)return;gAbs.push({name:it.name,trigger:t.trigger,effect:t.effect,rageAmt:a.r||t.defR,hitN:a.hitN||t.hitN,turnN:a.turnN||t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact});});});
+          const turns=simCombat(enemies,0,[...gAbs,...sAbs],dodgeFirst,rasPerKill,ignoreKills,oneShot,priority2RA,optGoal);
+          const score=scoreTurns(turns,optGoal);
+          if(score>localBest.score){localBest={score,gear:cur.slice(),shrineKeys:shrineKeys.slice(),turns};}
+          return;
+        }
+        for(const it of filteredSlotItems[idx]){cur.push(it);combine(idx+1,cur);cur.pop();}
+      }
+      combine(0,[]);
+    }
+
+    if(localBest.gear){
+      const t1RA=(localBest.turns[0]||{}).ra||0;
+      const infinite=t1RA>=3;
+      const hasPoisonSlot=forceEmpty!==null;
+      // Track result for each attempted slot
+      overallBest.perSlot[forceEmpty===null?'none':forceEmpty]={
+        gear:localBest.gear,
+        shrineKeys:localBest.shrineKeys,
+        turns:localBest.turns,
+        score:localBest.score,
+        t1RA,
+        infinite,
+      };
+      // Ranking: infinite+poison > infinite > non-infinite+poison > non-infinite
+      const tier = (infinite?2:0) + (hasPoisonSlot?1:0);
+      const bestTier = (overallBest.infinite?2:0) + (overallBest.hasPoisonSlot?1:0);
+      if(tier>bestTier || (tier===bestTier && localBest.score>overallBest.score)){
+        overallBest={...overallBest,gear:localBest.gear,shrineKeys:localBest.shrineKeys,turns:localBest.turns,score:localBest.score,forcedEmpty:forceEmpty,infinite,hasPoisonSlot};
+      }
+    }
+  } // end poisonSlotsToTry loop
+
+  const bestGear=overallBest.gear;
+  const bestShrineKeys=overallBest.shrineKeys;
+  const bestTurns=overallBest.turns;
+
+  if(!bestGear){resultDiv.innerHTML='<div class="empty">No valid build</div>';return;}
+
+  SLOTS.forEach((s,i)=>{if(!locked[s.id])equipped[s.id]=bestGear[i]?bestGear[i].name:null;});
+  bestShrineKeys.forEach((k,i)=>{const sel=document.getElementById('shrineChoice'+i);if(sel&&k)sel.value=k;});
+  render();
+
+  // Detect infinite: at least 3 RAs on turn 1
+  const t1RA=(bestTurns&&bestTurns[0])?bestTurns[0].ra:0;
+  const isInfinite=t1RA>=3;
+  const lockedSlots=SLOTS.filter(s=>locked[s.id]).map(s=>s.name);
+  const slotLabel={helm:'Helm',neck:'Neck',ring:'Ring'};
+
+  // Collect all slots where infinite is achievable
+  const viablePoisonSlots=['helm','neck','ring'].filter(s=>overallBest.perSlot[s]&&overallBest.perSlot[s].infinite);
+  const anyInfinite=isInfinite||viablePoisonSlots.length>0;
+
+  let msg='';
+  if(isInfinite && viablePoisonSlots.length>0){
+    msg=`<div style="font-size:.88rem;color:#3a8a3a;font-weight:700">✓ Infinite rage available with poison cleanse in: ${viablePoisonSlots.map(s=>slotLabel[s]).join(', ')}</div>`;
+  }else if(anyInfinite && viablePoisonSlots.length===0){
+    msg=`<div style="font-size:.88rem;color:#c85030;font-weight:700">⚠ Infinite rage found, but not compatible with reserving Helm/Neck/Ring for poison cleanse.</div>`;
+  }else if(viablePoisonSlots.length>0){
+    msg=`<div style="font-size:.88rem;color:#3a8a3a;font-weight:700">✓ Infinite rage available with poison cleanse in: ${viablePoisonSlots.map(s=>slotLabel[s]).join(', ')}</div>`;
+  }else{
+    msg=`<div style="font-size:.88rem;color:#c85030;font-weight:700">⚠ No infinite build possible. Best attempt: ${t1RA} RA(s) on T1.</div>`;
+  }
+
+  // Expose viable slots so simulate() can show them in the badge
+  window.__viablePoisonSlots=viablePoisonSlots;
+  window.__optimizerRan=true;
+
+  resultDiv.innerHTML=`${msg}<div style="font-size:.74rem;color:var(--text-dim);font-style:italic;font-weight:500;margin-top:.2rem">${lockedSlots.length>0?'Locked: '+lockedSlots.join(', '):''}</div>`;
+  simulate();
+}
+
+// ======== VENDING IMPORT ========
+function importShrines(){
+  const text=document.getElementById('shrineImportText').value;
+  const msg=document.getElementById('shrineImportMsg');
+
+  // Always skip these even if recognised
+  const SKIP=new Set(['strike_twice','shield_on_kill','lightning_on_kill','shield_on_rage','shield_on_hit_5','shield_on_turn_4','shield_if_low','two_for_two_lightning']);
+
+  // Ability text → key lookup
+  const MAP={
+    'r on h':'rage_on_heal','r on heal':'rage_on_heal',
+    'r on hit 5':'rage_on_hit_5',
+    'r on l':'rage_on_lightning','r on lightning':'rage_on_lightning',
+    'r on mk':'rage_on_magic_knife','r on magic knife':'rage_on_magic_knife',
+    '+r on atk':'bonus_rage_on_attack',
+    'r on 1st turn':'rage_on_first_turn','r on first turn':'rage_on_first_turn',
+    'r on kill':'rage_on_kill','r on enemy death':'rage_on_kill',
+    'l on r':'bolt_on_rage','bolt on rage':'bolt_on_rage',
+    '2 for 2 l':'two_for_two_lightning','two for two':'two_for_two_lightning',
+    'l on atk':'lightning_on_attack','l on attack':'lightning_on_attack',
+    'l every 5 hits':'lightning_every_5_hits','l every 5':'lightning_every_5_hits',
+    'l on hit 4':'lightning_on_hit_4',
+    'l on kill':'lightning_on_kill','l on enemy death':'lightning_on_kill',
+    'l on turn start':'lightning_on_turn_start',
+    'l on s':'lightning_on_shield','l on shield':'lightning_on_shield',
+    'mk':'magic_knife_on_attack','mk on atk':'magic_knife_on_attack','mk on attack':'magic_knife_on_attack',
+    'mk on r':'magic_knife_on_rage','mk on rage':'magic_knife_on_rage',
+    'mk every 3 turns':'magic_knife_every_3_turns',
+    'mk on hit 2':'magic_knife_on_hit_2',
+    'mk on kill':'magic_knife_on_kill','mk on enemy death':'magic_knife_on_kill',
+    'mk on crit':'magic_knife_on_crit',
+    'h on l':'heal_on_lightning','h on lightning':'heal_on_lightning',
+    'h on mk':'heal_on_magic_knife','h on magic knife':'heal_on_magic_knife',
+    'h on r':'heal_on_rage','h on rage':'heal_on_rage',
+    'h on 1st turn':'heal_on_first_turn','h on first turn':'heal_on_first_turn',
+    'h on kill':'heal_on_kill','h on enemy death':'heal_on_kill',
+    'h on hit 3':'heal_on_hit_3',
+    's on kill':'shield_on_kill','s on enemy death':'shield_on_kill',
+    's on hit 5':'shield_on_hit_5','s on turn 4':'shield_on_turn_4',
+    's on r':'shield_on_rage','s on rage':'shield_on_rage','s if low':'shield_if_low',
+    'strike twice':'strike_twice','strike twice every other':'strike_twice',
+    'life steal':'life_steal','life steal on atk':'life_steal',
+    'low hp def boost':'low_hp_defence',
+    'crit up low hp':'crit_up_max_hp','crit up if max hp':'crit_up_max_hp',
+    'second wind':'second_wind','fill r on low hp':'fill_rage_low_hp',
+  };
+
+  function parseAbility(raw){
+    const s=raw.toLowerCase().trim().replace(/[()]/g,'');
+    let key=MAP[s];
+    if(!key){for(const [k,v] of Object.entries(MAP)){if(s===k||(s.length>2&&(s.includes(k)||k.includes(s)))){key=v;break;}}}
+    if(!key||SKIP.has(key))return null;
+    return key;
+  }
+
+  // Parse each M line — handles both formats:
+  // M1: Floor 6(ability1, ability2) and M1- ability1, ability2
+  const lines=text.split('\n');
+  const shrines=[];
+  for(const line of lines){
+    // Try format with parentheses: M1: Floor 6(...)
+    let m=line.match(/m(\d+)\s*[:\-].*?\(([^)]+)\)/i);
+    if(!m){
+      // Try format without parentheses: M1- ability1, ability2, ability3
+      m=line.match(/m(\d+)\s*[:\-]\s*(.+)/i);
+      // Skip if it looks like a vault/floor line
+      if(m&&/fl\d+|vault|floor|luminite|coins/i.test(m[2]))m=null;
+    }
+    if(!m)continue;
+    const idx=parseInt(m[1])-1;
+    const parts=m[2].split(',').map(s=>s.trim());
+    const opts=parts.map(parseAbility).filter(Boolean).slice(0,3);
+    while(opts.length<3)opts.push('');
+    shrines[idx]={opts};
+  }
+
+  if(shrines.length===0){msg.textContent='⚠ No M1/M2... lines found';return;}
+
+  // Fill gaps
+  // Pad up to 9 vending machines
+  const target=9;
+  for(let i=0;i<target;i++)if(!shrines[i])shrines[i]={opts:['','','']};
+  const filled=shrines.filter(s=>s.opts.some(Boolean)).length;
+
+  // Apply
+  shrinePlan=shrines.slice(0,target);
+  renderShrinePlanner();
+  simulate();
+  document.getElementById('shrineImportBox').style.display='none';
+  msg.textContent=`✓ Imported ${filled} vending machines`;
+}
+
+// ======== INIT ========
+(function(){
+  render();
+  renderShrinePlanner();
+})();
+</script>
+</body>
+</html>
