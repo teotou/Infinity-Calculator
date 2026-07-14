@@ -129,12 +129,10 @@
 
 <!-- COMBAT SIM + OPTIMIZER (merged) -->
 <div class="panel" style="border-color:var(--accent-dark);border-width:2px">
-  <div class="sl" style="margin-bottom:.5rem">Combat Simulation</div>
-  <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.6rem">
-
-
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:.6rem;flex-wrap:wrap">
+    <div class="sl" style="margin:0">Combat Simulation</div>
+    <button class="btn btn-gold" onclick="optimize()" style="font-size:1.05rem;padding:.7rem 2rem;font-weight:800;letter-spacing:.02em">⚔ Find Best Build</button>
     <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.78rem;color:var(--text-dim);font-weight:600"><input type="checkbox" id="noviceMode" onchange="simulate()" style="width:auto;accent-color:var(--c-knife)"> Novice items</label>
-    <button class="btn btn-gold" onclick="optimize()" style="margin-left:auto">⚔ Find Best Build</button>
   </div>
   <div id="optResult" style="margin-bottom:.4rem;"></div>
   <div class="stats-grid" id="simStats"></div>
@@ -149,18 +147,7 @@
 <!-- VENDING MACHINE PLANNER -->
 <div class="panel">
   <div class="sl">Vending Machines</div>
-  <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;">
-    <div style="font-size:.8rem;color:var(--text-dim);font-weight:500;">9 vending machines · 3 abilities each — optimizer picks the best one.</div>
-    <button class="btn btn-primary" onclick="document.getElementById('shrineImportBox').style.display=document.getElementById('shrineImportBox').style.display==='none'?'block':'none'" style="margin-left:auto;font-size:.72rem;padding:.35rem .8rem">📋 Import</button>
-  </div>
-  <div id="shrineImportBox" style="display:none;margin-bottom:.6rem;background:#f4e8f8;border:1.5px solid var(--c-knife);border-radius:10px;padding:.7rem .85rem">
-    <div style="font-size:.75rem;font-weight:700;color:var(--c-knife);margin-bottom:.35rem">Paste your vending machine list (M1: ..., M2: ...) and click Import</div>
-    <textarea id="shrineImportText" placeholder="M1: Floor 6(2 for 2 L, H on 1st turn, strike twice every other)&#10;M2: Floor 30(R on L, Attack in high hp, crit up low hp)&#10;..." style="width:100%;height:110px;font-size:.78rem;border-radius:6px;border:1.5px solid var(--c-knife);padding:.4rem;font-family:monospace;resize:vertical"></textarea>
-    <div style="display:flex;gap:.5rem;margin-top:.4rem;align-items:center">
-      <button class="btn btn-gold" onclick="importShrines()" style="font-size:.78rem">⚡ Parse & Import</button>
-      <span id="shrineImportMsg" style="font-size:.75rem;color:var(--text-dim)"></span>
-    </div>
-  </div>
+  <div style="font-size:.8rem;color:var(--text-dim);font-weight:500;margin-bottom:.5rem;">9 vending machines · 3 abilities each — optimizer picks the best one.</div>
   <div id="shrinePlanner"></div>
 </div>
 </div>
