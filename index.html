@@ -743,11 +743,11 @@ function optimize(){
 
   let msg='';
   if(isInfinite && viablePoisonSlots.length>0){
-    msg=`<div style="font-size:.88rem;color:#3a8a3a;font-weight:700">✓ Infinite rage available with poison cleanse in: ${viablePoisonSlots.map(s=>slotLabel[s]).join(', ')}</div>`;
+    msg=`<div style="font-size:.88rem;color:#3a8a3a;font-weight:700">✓ Infinite rage available with poison cleanse in: ${viablePoisonSlots.map(s=>slotLabel[s]).join(', ')}</div><div style="font-size:.76rem;color:#c85030;font-weight:600;margin-top:.3rem;padding:.4rem .55rem;background:#fdf1e0;border-left:3px solid #f0a838;border-radius:4px">⚠ Don't just swap in a poison cleanse item — that can break the loop. Instead: in the gear planner, set the slot to "— No [slot] —", check its Lock box, and hit Find Best Build again. The optimizer will rebuild around the reserved slot, then you can equip poison cleanse there in-game.</div>`;
   }else if(anyInfinite && viablePoisonSlots.length===0){
     msg=`<div style="font-size:.88rem;color:#c85030;font-weight:700">⚠ Infinite rage found, but not compatible with reserving Helm/Neck/Ring for poison cleanse.</div>`;
   }else if(viablePoisonSlots.length>0){
-    msg=`<div style="font-size:.88rem;color:#3a8a3a;font-weight:700">✓ Infinite rage available with poison cleanse in: ${viablePoisonSlots.map(s=>slotLabel[s]).join(', ')}</div>`;
+    msg=`<div style="font-size:.88rem;color:#3a8a3a;font-weight:700">✓ Infinite rage available with poison cleanse in: ${viablePoisonSlots.map(s=>slotLabel[s]).join(', ')}</div><div style="font-size:.76rem;color:#c85030;font-weight:600;margin-top:.3rem;padding:.4rem .55rem;background:#fdf1e0;border-left:3px solid #f0a838;border-radius:4px">⚠ Don't just swap in a poison cleanse item — that can break the loop. Instead: in the gear planner, set the slot to "— No [slot] —", check its Lock box, and hit Find Best Build again. The optimizer will rebuild around the reserved slot, then you can equip poison cleanse there in-game.</div>`;
   }else{
     msg=`<div style="font-size:.88rem;color:#c85030;font-weight:700">⚠ No infinite build possible. Best attempt: ${t1RA} RA(s) on T1.</div>`;
   }
