@@ -82,6 +82,8 @@
   /* Stats grid - dark navy pills like HP/DEF in reference */
   .stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(95px,1fr));gap:.4rem;margin:.7rem 0}
   .stat-box{background:var(--panel-dark);border-radius:10px;padding:.6rem .4rem;text-align:center;color:var(--text-light)}
+  @keyframes over9000-pulse{0%,100%{box-shadow:0 0 8px #6ee88a,0 0 16px #6ee88a55}50%{box-shadow:0 0 16px #6ee88a,0 0 28px #6ee88a99,0 0 40px #6ee88a55}}
+  .over9000-glow{animation:over9000-pulse 1.6s ease-in-out infinite}
   .sv{font-size:1.4rem;line-height:1.1;color:var(--text-light);font-weight:800}
   .sla{font-size:.55rem;letter-spacing:.16em;text-transform:uppercase;color:var(--text-light-dim);margin-top:.2rem;font-weight:600}
 
@@ -569,9 +571,26 @@ function simulate(){
     poisonText='✓ '+freeSlots.map(s=>slotLabel[s]).join(', ');
   }
 
+  // Over 9000: infinite rage AND both ring and weapon slots empty (ring for poison cleanse, weapon free)
+  const weaponEmpty=(()=>{
+    const eq=equipped.weapon;
+    if(!eq)return true;
+    const item=ITEM_DB.weapon.find(i=>i.name===eq);
+    return item&&item.abs.length===0;
+  })();
+  const ringEmpty=(()=>{
+    const eq=equipped.ring;
+    if(!eq)return true;
+    const item=ITEM_DB.ring.find(i=>i.name===eq);
+    return item&&item.abs.length===0;
+  })();
+  const over9000=isInfinite&&weaponEmpty&&ringEmpty;
+  const over9000Text=over9000?'✓ YES':'✗ NO';
+
   document.getElementById('simStats').innerHTML=`
     <div class="stat-box" style="background:${isInfinite?'#e0f4e8':'#fde8e0'};border-color:${isInfinite?'#3ec070':'#e84030'}"><div class="sv" style="color:${isInfinite?'#3ec070':'#e84030'};font-size:1rem">${isInfinite?'✓ YES':'✗ NO'}</div><div class="sla" style="color:${isInfinite?'#3ec070':'#e84030'}">Infinite Rage</div></div>
-    <div class="stat-box" style="background:${hasPoisonSlot?'#e0f4e8':'#fde8e0'};border-color:${hasPoisonSlot?'#3ec070':'#e84030'}"><div class="sv" style="color:${hasPoisonSlot?'#3ec070':'#e84030'};font-size:1rem">${poisonText}</div><div class="sla" style="color:${hasPoisonSlot?'#3ec070':'#e84030'}">Poison Cleanse Slot</div></div>`;
+    <div class="stat-box" style="background:${hasPoisonSlot?'#e0f4e8':'#fde8e0'};border-color:${hasPoisonSlot?'#3ec070':'#e84030'}"><div class="sv" style="color:${hasPoisonSlot?'#3ec070':'#e84030'};font-size:1rem">${poisonText}</div><div class="sla" style="color:${hasPoisonSlot?'#3ec070':'#e84030'}">Poison Cleanse Slot</div></div>
+    <div class="stat-box ${over9000?'over9000-glow':''}" style="background:${over9000?'#dcffe0':'#fde8e0'};border-color:${over9000?'#2fb050':'#e84030'};border-width:${over9000?'2.5px':'1.5px'}"><div class="sv" style="color:${over9000?'#2fb050':'#e84030'};font-size:1rem;${over9000?'text-shadow:0 0 8px #6ee88a':''}">${over9000Text}</div><div class="sla" style="color:${over9000?'#2fb050':'#e84030'};font-weight:700">Over 9000</div></div>`;
 
   let cumKills=0;
   document.getElementById('simProj').innerHTML=turns.map(t=>{
@@ -638,13 +657,13 @@ function optimize(){
   const poisonMode=true; // always try
   const resultDiv=document.getElementById('optResult');
 
-  // Two-pass strategy: try poison-cleanse first (empty helm/neck/ring), keep best.
-  // Then try without poison reservation. Use poison result if it's also infinite.
-  const poisonSlotsToTry = poisonMode ? ['helm','neck','ring',null] : [null];
+  // Search combinations: try no reservation, single slot reserved, and combos (ring+weapon for over 9000)
+  const poisonSlotsToTry = poisonMode ? [null, 'helm', 'neck', 'ring', 'ring+weapon'] : [null];
 
   let overallBest = {score:-Infinity, gear:null, shrineKeys:null, turns:null, forcedEmpty:null, perSlot:{}};
 
   for(const forceEmpty of poisonSlotsToTry){
+    const forcedSlots=forceEmpty?forceEmpty.split('+'):[];
     // Respect locked slots
     const slotItems=SLOTS.map(s=>{
       if(locked[s.id]&&equipped[s.id]){
@@ -652,7 +671,7 @@ function optimize(){
         return item?[item]:[null];
       }
       // If forcing this slot empty, only allow the No-X option
-      if(forceEmpty===s.id){
+      if(forcedSlots.includes(s.id)){
         const empty=ITEM_DB[s.id].find(i=>i.abs.length===0);
         return empty?[empty]:[null];
       }
@@ -703,6 +722,7 @@ function optimize(){
       const t1RA=(localBest.turns[0]||{}).ra||0;
       const infinite=t1RA>=40;
       const hasPoisonSlot=forceEmpty!==null;
+      const isOver9000=infinite && forceEmpty==='ring+weapon';
       // Track result for each attempted slot
       overallBest.perSlot[forceEmpty===null?'none':forceEmpty]={
         gear:localBest.gear,
@@ -712,9 +732,10 @@ function optimize(){
         t1RA,
         infinite,
       };
-      // Ranking: infinite+poison > infinite > non-infinite+poison > non-infinite
-      const tier = (infinite?2:0) + (hasPoisonSlot?1:0);
-      const bestTier = (overallBest.infinite?2:0) + (overallBest.hasPoisonSlot?1:0);
+      // Ranking: over 9000 > infinite+poison > infinite > non-infinite+poison > non-infinite
+      const tier = (isOver9000?4:0) + (infinite?2:0) + (hasPoisonSlot?1:0);
+      const bestIsOver9000 = overallBest.infinite && overallBest.forcedEmpty==='ring+weapon';
+      const bestTier = (bestIsOver9000?4:0) + (overallBest.infinite?2:0) + (overallBest.hasPoisonSlot?1:0);
       if(tier>bestTier || (tier===bestTier && localBest.score>overallBest.score)){
         overallBest={...overallBest,gear:localBest.gear,shrineKeys:localBest.shrineKeys,turns:localBest.turns,score:localBest.score,forcedEmpty:forceEmpty,infinite,hasPoisonSlot};
       }
