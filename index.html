@@ -134,12 +134,11 @@
   <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:.6rem;flex-wrap:wrap">
     <div class="sl" style="margin:0">Combat Simulation</div>
     <button class="btn btn-gold" onclick="optimize()" style="font-size:1.05rem;padding:.7rem 2rem;font-weight:800;letter-spacing:.02em">⚔ Find Best Build</button>
-    <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.78rem;color:var(--text-dim);font-weight:600"><input type="checkbox" id="noviceMode" onchange="simulate()" style="width:auto;accent-color:var(--c-knife)"> Novice items</label>
+    <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.78rem;color:var(--text-dim);font-weight:600"><input type="checkbox" id="noviceMode" onchange="simulate()" style="width:auto;accent-color:var(--c-knife)"> No legacy items</label>
   </div>
   <div id="optResult" style="margin-bottom:.4rem;"></div>
   <div class="stats-grid" id="simStats"></div>
-  <div class="sl collapsible-header" onclick="document.getElementById('simProj').classList.toggle('collapsed');this.querySelector('.caret').classList.toggle('open')" style="margin-top:.5rem;cursor:pointer">Turn-by-Turn <span class="caret open">▸</span></div>
-  <div id="simProj" class="collapsible-content"></div>
+  <div id="simProj" style="display:none"></div>
   <div class="sl collapsible-header" style="margin-top:.5rem;cursor:pointer" onclick="document.getElementById('simBuild').classList.toggle('collapsed');this.querySelector('.caret').classList.toggle('open')">Build Details <span class="caret open">▸</span></div>
   <div id="simBuild" class="collapsible-content"></div>
   <div class="sl collapsible-header" style="margin-top:.5rem;cursor:pointer" onclick="document.getElementById('simLog').classList.toggle('collapsed');this.querySelector('.caret').classList.toggle('open')">Turn 1 Chain Trace <span class="caret">▸</span></div>
