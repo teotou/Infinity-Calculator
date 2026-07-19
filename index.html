@@ -586,9 +586,9 @@ function simulate(){
   const over9000=isInfinite&&weaponEmpty&&ringEmpty;
   const over9000Text=over9000?'✓ YES':'✗ NO';
 
-  // Dodge safe: build has no on-hit abilities
+  // Dodge safe: build has no risky on-hit abilities (lightning on-hit is safe)
   const dodgeSafe=(()=>{
-    for(const a of abs){if(a.trigger==='hit')return false;}
+    for(const a of abs){if(a.trigger==='hit'&&a.effect!=='lightning')return false;}
     return true;
   })();
   const dodgeText=dodgeSafe?'✓ YES':'✗ NO';
@@ -693,8 +693,9 @@ function optimize(){
       return ITEM_DB[s.id].length>0?ITEM_DB[s.id]:[null];
     });
 
-    // Filter out on-hit abilities in shrine combos when avoidNoHit enabled
-    const isOnHit=k=>{const t=AB[k];return t&&t.trigger==='hit';};
+    // Filter out knife-based on-hit abilities in shrine combos when avoidNoHit enabled
+    // (lightning on-hit is safe, only knife/heal/rage on-hit can miss)
+    const isRiskyOnHit=k=>{const t=AB[k];if(!t)return false;if(t.trigger!=='hit')return false;return t.effect!=='lightning';};
     const shrineCombos=[];
     function buildShrineCombos(idx,current){
       if(idx>=shrinePlan.length){shrineCombos.push(current.slice());return;}
@@ -703,7 +704,7 @@ function optimize(){
       if(manualChoice&&manualChoice.value){current.push(manualChoice.value);buildShrineCombos(idx+1,current);current.pop();}
       else{
         let opts=shrine.opts.filter(Boolean);
-        if(avoidNoHit)opts=opts.filter(k=>!isOnHit(k));
+        if(avoidNoHit)opts=opts.filter(k=>!isRiskyOnHit(k));
         if(opts.length===0){current.push(null);buildShrineCombos(idx+1,current);current.pop();}
         else{opts.forEach(k=>{current.push(k);buildShrineCombos(idx+1,current);current.pop();});
           // Also allow choosing nothing from this shrine so we can skip risky ones
@@ -716,7 +717,7 @@ function optimize(){
 
     // Filter items by goal relevance
     const isRageUseful=a=>{const t=AB[a.k];if(!t)return false;return!t.noImpact&&t.effect!=='none'&&t.effect!=='shield';};
-    const itemHasOnHit=it=>getItemAbs(it).some(a=>{const t=AB[a.k];return t&&t.trigger==='hit';});
+    const itemHasOnHit=it=>getItemAbs(it).some(a=>{const t=AB[a.k];return t&&t.trigger==='hit'&&t.effect!=='lightning';});
     const filteredSlotItems=slotItems.map((items,i)=>{
       if(locked[SLOTS[i].id])return items;
       let filtered=items;
