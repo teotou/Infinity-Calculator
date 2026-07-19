@@ -669,13 +669,10 @@ function optimize(){
   let overallBest = {score:-Infinity, gear:null, shrineKeys:null, turns:null, forcedEmpty:null, perSlot:{}, dodgeSafe:false};
 
   for(const avoidNoHitPass of [true, false]){
-    // If first pass already found infinite, skip second pass
-    if(!avoidNoHitPass && overallBest.infinite) break;
+    // If first pass found any viable build (even non-infinite), skip second pass
+    // Only fall back to on-hit abilities if pass 1 found literally nothing
+    if(!avoidNoHitPass && overallBest.gear) break;
     const avoidNoHit=avoidNoHitPass;
-    // If we're in second pass, reset overallBest but track that it's not dodge-safe
-    if(!avoidNoHitPass){
-      overallBest = {score:-Infinity, gear:null, shrineKeys:null, turns:null, forcedEmpty:null, perSlot:{}, dodgeSafe:false};
-    }
 
   // Search combinations: try no reservation, single slot reserved, and combos (ring+weapon for over 9000)
   const poisonSlotsToTry = poisonMode ? [null, 'helm', 'neck', 'ring', 'ring+weapon'] : [null];
