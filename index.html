@@ -586,9 +586,17 @@ function simulate(){
   const over9000=isInfinite&&weaponEmpty&&ringEmpty;
   const over9000Text=over9000?'✓ YES':'✗ NO';
 
+  // Dodge safe: build has no on-hit abilities
+  const dodgeSafe=(()=>{
+    for(const a of abs){if(a.trigger==='hit')return false;}
+    return true;
+  })();
+  const dodgeText=dodgeSafe?'✓ YES':'✗ NO';
+
   document.getElementById('simStats').innerHTML=`
     <div class="stat-box" style="background:${isInfinite?'#e0f4e8':'#fde8e0'};border-color:${isInfinite?'#3ec070':'#e84030'}"><div class="sv" style="color:${isInfinite?'#3ec070':'#e84030'};font-size:1rem">${isInfinite?'✓ YES':'✗ NO'}</div><div class="sla" style="color:${isInfinite?'#3ec070':'#e84030'}">Infinite Rage</div></div>
     <div class="stat-box" style="background:${hasPoisonSlot?'#e0f4e8':'#fde8e0'};border-color:${hasPoisonSlot?'#3ec070':'#e84030'}"><div class="sv" style="color:${hasPoisonSlot?'#3ec070':'#e84030'};font-size:1rem">${poisonText}</div><div class="sla" style="color:${hasPoisonSlot?'#3ec070':'#e84030'}">Poison Cleanse Slot</div></div>
+    <div class="stat-box" style="background:${dodgeSafe?'#e0f4e8':'#fde8e0'};border-color:${dodgeSafe?'#3ec070':'#e84030'}"><div class="sv" style="color:${dodgeSafe?'#3ec070':'#e84030'};font-size:1rem">${dodgeText}</div><div class="sla" style="color:${dodgeSafe?'#3ec070':'#e84030'}">Dodge-Safe</div></div>
     <div class="stat-box ${over9000?'over9000-glow':''}" style="background:${over9000?'#dcffe0':'#fde8e0'};border-color:${over9000?'#2fb050':'#e84030'};border-width:${over9000?'2.5px':'1.5px'}"><div class="sv" style="color:${over9000?'#2fb050':'#e84030'};font-size:1rem;${over9000?'text-shadow:0 0 8px #6ee88a':''}">${over9000Text}</div><div class="sla" style="color:${over9000?'#2fb050':'#e84030'};font-weight:700">Over 9000</div></div>`;
 
   let cumKills=0;
@@ -656,10 +664,21 @@ function optimize(){
   const poisonMode=true; // always try
   const resultDiv=document.getElementById('optResult');
 
+  // Run twice: first pass with avoidNoHit=true, second pass with false
+  // If first pass finds an infinite build, use it. Otherwise fall back to second pass.
+  let overallBest = {score:-Infinity, gear:null, shrineKeys:null, turns:null, forcedEmpty:null, perSlot:{}, dodgeSafe:false};
+
+  for(const avoidNoHitPass of [true, false]){
+    // If first pass already found infinite, skip second pass
+    if(!avoidNoHitPass && overallBest.infinite) break;
+    const avoidNoHit=avoidNoHitPass;
+    // If we're in second pass, reset overallBest but track that it's not dodge-safe
+    if(!avoidNoHitPass){
+      overallBest = {score:-Infinity, gear:null, shrineKeys:null, turns:null, forcedEmpty:null, perSlot:{}, dodgeSafe:false};
+    }
+
   // Search combinations: try no reservation, single slot reserved, and combos (ring+weapon for over 9000)
   const poisonSlotsToTry = poisonMode ? [null, 'helm', 'neck', 'ring', 'ring+weapon'] : [null];
-
-  let overallBest = {score:-Infinity, gear:null, shrineKeys:null, turns:null, forcedEmpty:null, perSlot:{}};
 
   for(const forceEmpty of poisonSlotsToTry){
     const forcedSlots=forceEmpty?forceEmpty.split('+'):[];
@@ -677,26 +696,39 @@ function optimize(){
       return ITEM_DB[s.id].length>0?ITEM_DB[s.id]:[null];
     });
 
+    // Filter out on-hit abilities in shrine combos when avoidNoHit enabled
+    const isOnHit=k=>{const t=AB[k];return t&&t.trigger==='hit';};
     const shrineCombos=[];
     function buildShrineCombos(idx,current){
       if(idx>=shrinePlan.length){shrineCombos.push(current.slice());return;}
       const shrine=shrinePlan[idx];
       const manualChoice=document.getElementById('shrineChoice'+idx);
       if(manualChoice&&manualChoice.value){current.push(manualChoice.value);buildShrineCombos(idx+1,current);current.pop();}
-      else{const opts=shrine.opts.filter(Boolean);if(opts.length===0){current.push(null);buildShrineCombos(idx+1,current);current.pop();}else{opts.forEach(k=>{current.push(k);buildShrineCombos(idx+1,current);current.pop();});}}
+      else{
+        let opts=shrine.opts.filter(Boolean);
+        if(avoidNoHit)opts=opts.filter(k=>!isOnHit(k));
+        if(opts.length===0){current.push(null);buildShrineCombos(idx+1,current);current.pop();}
+        else{opts.forEach(k=>{current.push(k);buildShrineCombos(idx+1,current);current.pop();});
+          // Also allow choosing nothing from this shrine so we can skip risky ones
+          if(avoidNoHit){current.push(null);buildShrineCombos(idx+1,current);current.pop();}
+        }
+      }
     }
     buildShrineCombos(0,[]);
     if(shrineCombos.length===0)shrineCombos.push([]);
 
     // Filter items by goal relevance
     const isRageUseful=a=>{const t=AB[a.k];if(!t)return false;return!t.noImpact&&t.effect!=='none'&&t.effect!=='shield';};
+    const itemHasOnHit=it=>getItemAbs(it).some(a=>{const t=AB[a.k];return t&&t.trigger==='hit';});
     const filteredSlotItems=slotItems.map((items,i)=>{
       if(locked[SLOTS[i].id])return items;
+      let filtered=items;
+      if(avoidNoHit)filtered=filtered.filter(it=>it.abs.length===0||!itemHasOnHit(it));
       if(optGoal==='maxRA'){
-        const useful=items.filter(it=>it.abs.length===0||getItemAbs(it).some(isRageUseful));
-        return useful.length>0?useful:items;
+        const useful=filtered.filter(it=>it.abs.length===0||getItemAbs(it).some(isRageUseful));
+        filtered=useful.length>0?useful:filtered;
       }
-      return items;
+      return filtered.length>0?filtered:items;
     });
 
     const shrineAbs=k=>{const t=AB[k];if(!t)return null;return{name:t.name+' (vending)',trigger:t.trigger,effect:t.effect,rageAmt:t.defR,hitN:t.hitN,turnN:t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact};};
@@ -736,10 +768,12 @@ function optimize(){
       const bestIsOver9000 = overallBest.infinite && overallBest.forcedEmpty==='ring+weapon';
       const bestTier = (bestIsOver9000?4:0) + (overallBest.infinite?2:0) + (overallBest.hasPoisonSlot?1:0);
       if(tier>bestTier || (tier===bestTier && localBest.score>overallBest.score)){
-        overallBest={...overallBest,gear:localBest.gear,shrineKeys:localBest.shrineKeys,turns:localBest.turns,score:localBest.score,forcedEmpty:forceEmpty,infinite,hasPoisonSlot};
+        overallBest={...overallBest,gear:localBest.gear,shrineKeys:localBest.shrineKeys,turns:localBest.turns,score:localBest.score,forcedEmpty:forceEmpty,infinite,hasPoisonSlot,dodgeSafe:avoidNoHit};
       }
     }
   } // end poisonSlotsToTry loop
+
+  } // end avoidNoHitPass loop
 
   const bestGear=overallBest.gear;
   const bestShrineKeys=overallBest.shrineKeys;
