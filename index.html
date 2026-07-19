@@ -593,11 +593,14 @@ function simulate(){
   })();
   const dodgeText=dodgeSafe?'✓ YES':'✗ NO';
 
+  const t1Rgen=(turns[0]||{}).totalR||0;
+
   document.getElementById('simStats').innerHTML=`
     <div class="stat-box" style="background:${isInfinite?'#e0f4e8':'#fde8e0'};border-color:${isInfinite?'#3ec070':'#e84030'}"><div class="sv" style="color:${isInfinite?'#3ec070':'#e84030'};font-size:1rem">${isInfinite?'✓ YES':'✗ NO'}</div><div class="sla" style="color:${isInfinite?'#3ec070':'#e84030'}">Infinite Rage</div></div>
     <div class="stat-box" style="background:${hasPoisonSlot?'#e0f4e8':'#fde8e0'};border-color:${hasPoisonSlot?'#3ec070':'#e84030'}"><div class="sv" style="color:${hasPoisonSlot?'#3ec070':'#e84030'};font-size:1rem">${poisonText}</div><div class="sla" style="color:${hasPoisonSlot?'#3ec070':'#e84030'}">Poison Cleanse Slot</div></div>
     <div class="stat-box" style="background:${dodgeSafe?'#e0f4e8':'#fde8e0'};border-color:${dodgeSafe?'#3ec070':'#e84030'}"><div class="sv" style="color:${dodgeSafe?'#3ec070':'#e84030'};font-size:1rem">${dodgeText}</div><div class="sla" style="color:${dodgeSafe?'#3ec070':'#e84030'}">Dodge-Safe</div></div>
-    <div class="stat-box ${over9000?'over9000-glow':''}" style="background:${over9000?'#dcffe0':'#fde8e0'};border-color:${over9000?'#2fb050':'#e84030'};border-width:${over9000?'2.5px':'1.5px'}"><div class="sv" style="color:${over9000?'#2fb050':'#e84030'};font-size:1rem;${over9000?'text-shadow:0 0 8px #6ee88a':''}">${over9000Text}</div><div class="sla" style="color:${over9000?'#2fb050':'#e84030'};font-weight:700">Over 9000</div></div>`;
+    <div class="stat-box ${over9000?'over9000-glow':''}" style="background:${over9000?'#dcffe0':'#fde8e0'};border-color:${over9000?'#2fb050':'#e84030'};border-width:${over9000?'2.5px':'1.5px'}"><div class="sv" style="color:${over9000?'#2fb050':'#e84030'};font-size:1rem;${over9000?'text-shadow:0 0 8px #6ee88a':''}">${over9000Text}</div><div class="sla" style="color:${over9000?'#2fb050':'#e84030'};font-weight:700">Over 9000</div></div>
+    <div class="stat-box" style="background:#fef3d8;border-color:#e8a838"><div class="sv" style="color:#c8783a;font-size:1rem">${t1Rgen}</div><div class="sla" style="color:#c8783a">Rage / Turn</div></div>`;
 
   let cumKills=0;
   document.getElementById('simProj').innerHTML=turns.map(t=>{
