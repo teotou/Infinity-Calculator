@@ -450,7 +450,7 @@ function simTurn(startRage,abs,turnNum,startEHp,enemies,shields,dodgeFirstAtk,en
     else if(a.effect==='heal'){log.push({t:'event',a:`💚 ${a.name}`});byT.heal.forEach(eff);}
     else if(a.effect==='shield'){shGained++;sh++;log.push({t:'event',a:`🛡 ${a.name}`});byT.shield.forEach(eff);}
   }
-  function doRA(){rage-=100;ra++;log.push({t:'ra',a:`⚔ Rage Attack #${ra}${isAOE?' (AOE)':''}`,r:rage});if(isAOE)dmgAOE(aoeDmgPerRA);else dmg(100);byT.rage.forEach(eff);}
+  function doRA(){rage-=100;ra++;regHit();log.push({t:'ra',a:`⚔ Rage Attack #${ra}${isAOE?' (AOE)':''}`,r:rage});if(isAOE)dmgAOE(aoeDmgPerRA);else dmg(100);byT.rage.forEach(eff);}
 
   if(turnNum===1&&byT.first_turn.length){log.push({t:'header',a:'First Turn'});byT.first_turn.forEach(eff);}
   if(byT.turn_start.length){
