@@ -552,7 +552,7 @@ function simulate(){
 
   const t1RA=(turns[0]||{}).ra||0;
   // Infinite = fired 40+ RAs on T1 (loop hit simulator safety cap = self-sustaining)
-  const isInfinite=t1RA>=40;
+  const isInfinite=t1RA>=30;
   // Check if any of helm/neck/ring is empty (available for poison cleanse in CURRENT equipped)
   const freeSlots=['helm','neck','ring'].filter(id=>{
     const eq=equipped[id];
@@ -756,7 +756,7 @@ function optimize(){
 
     if(localBest.gear){
       const t1RA=(localBest.turns[0]||{}).ra||0;
-      const infinite=t1RA>=40;
+      const infinite=t1RA>=30;
       const hasPoisonSlot=forceEmpty!==null;
       const isOver9000=infinite && forceEmpty==='ring+weapon';
       // Track result for each attempted slot
@@ -792,7 +792,7 @@ function optimize(){
 
   // Detect infinite: at least 3 RAs on turn 1
   const t1RA=(bestTurns&&bestTurns[0])?bestTurns[0].ra:0;
-  const isInfinite=t1RA>=40;
+  const isInfinite=t1RA>=30;
   const lockedSlots=SLOTS.filter(s=>locked[s.id]).map(s=>s.name);
   const slotLabel={helm:'Helm',neck:'Neck',ring:'Ring'};
 
