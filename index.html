@@ -76,7 +76,7 @@
   .ability-tag{display:inline-flex;align-items:center;gap:5px;background:var(--panel-dark);color:var(--text-light);border-radius:999px;padding:3px 10px 3px 4px;font-size:.7rem;font-weight:500}
 
   /* Shrine */
-  .shrine-planner{background:#fdf8e8;border:1.5px solid var(--border);border-radius:10px;padding:.5rem .65rem;margin-bottom:.4rem}
+  .shrine-planner{background:#fdf8e8;border:1.5px solid var(--border);border-radius:10px;padding:.45rem .5rem;margin-bottom:.4rem;min-width:0}
   .shrine-bubble{background:#fff;border:1.5px solid var(--border);border-radius:8px;padding:.25rem .4rem}
 
   /* Stats grid - dark navy pills like HP/DEF in reference */
@@ -123,34 +123,32 @@
 <div class="container">
 <header><h1>Infinity Calculator</h1><div class="sub">Sword &amp; Supper · Gear + Vending Machine Optimizer</div></header>
 
-<!-- GEAR -->
-<div class="panel">
-  <div class="sl">Equipped Gear</div>
-  <div class="gear-grid" id="gearGrid"></div>
-</div>
-
 <!-- COMBAT SIM + OPTIMIZER (merged) -->
 <div class="panel" style="border-color:var(--accent-dark);border-width:2px">
   <div style="display:flex;justify-content:space-between;align-items:center;gap:1rem;margin-bottom:.6rem;flex-wrap:wrap">
-    <div class="sl" style="margin:0">Combat Simulation</div>
-    <button class="btn btn-gold" onclick="optimize()" style="font-size:1.05rem;padding:.7rem 2rem;font-weight:800;letter-spacing:.02em">⚔ Find Best Build</button>
-    <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.78rem;color:var(--text-dim);font-weight:600"><input type="checkbox" id="noviceMode" onchange="simulate()" style="width:auto;accent-color:var(--c-knife)"> No legacy items</label>
-    <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.78rem;color:var(--text-dim);font-weight:600" title="Avoid abilities that fail if attack misses (knife on-hit only, lightning on-hit is safe)"><input type="checkbox" id="avoidNoHit" onchange="simulate()" style="width:auto;accent-color:var(--c-lightning)"> Dodge-safe</label>
+    <div class="sl" style="margin:0">Viable Builds</div>
   </div>
-  <div id="optResult" style="margin-bottom:.4rem;"></div>
-  <div class="stats-grid" id="simStats"></div>
-  <div id="simProj" style="display:none"></div>
-  <div class="sl collapsible-header" style="margin-top:.5rem;cursor:pointer" onclick="document.getElementById('simBuild').classList.toggle('collapsed');this.querySelector('.caret').classList.toggle('open')">Build Details <span class="caret open">▸</span></div>
-  <div id="simBuild" class="collapsible-content"></div>
-  <div class="sl collapsible-header" style="margin-top:.5rem;cursor:pointer" onclick="document.getElementById('simLog').classList.toggle('collapsed');this.querySelector('.caret').classList.toggle('open')">Turn 1 Chain Trace <span class="caret">▸</span></div>
-  <div class="chain-log collapsible-content collapsed" id="simLog"><div class="empty">Equip gear to see simulation</div></div>
+  <div id="buildsList"><div class="empty" style="padding:1.5rem;text-align:center;color:var(--text-dim);font-style:italic">Set your vending machines below, then click Find Builds.</div></div>
 </div>
 
 <!-- VENDING MACHINE PLANNER -->
 <div class="panel">
-  <div class="sl">Vending Machines</div>
-  <div style="font-size:.8rem;color:var(--text-dim);font-weight:500;margin-bottom:.5rem;">9 vending machines · 3 abilities each — optimizer picks the best one.</div>
+  <div style="display:flex;justify-content:flex-start;align-items:center;gap:1rem;margin-bottom:.5rem;flex-wrap:wrap">
+    <button class="btn btn-gold" onclick="optimize()" style="font-size:1.05rem;padding:.7rem 2rem;font-weight:800;letter-spacing:.02em">⚔ Find Builds</button>
+    <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.78rem;color:var(--text-dim);font-weight:600"><input type="checkbox" id="noviceMode" style="width:auto;accent-color:var(--c-knife)"> No legacy items</label>
+    <label style="display:flex;align-items:center;gap:.3rem;cursor:pointer;font-size:.78rem;color:var(--text-dim);font-weight:600" title="Avoid abilities that fail if attack misses (knife on-hit only, lightning on-hit is safe)"><input type="checkbox" id="avoidNoHit" style="width:auto;accent-color:var(--c-lightning)"> Dodge-safe</label>
+  </div>
   <div id="shrinePlanner"></div>
+</div>
+
+<!-- GEAR CHECKER -->
+<div class="panel">
+  <div class="sl collapsible-header" style="cursor:pointer;margin:0" onclick="document.getElementById('gearCheckerBody').classList.toggle('collapsed');this.querySelector('.caret').classList.toggle('open')">🔧 Check Your Gear <span class="caret">▸</span></div>
+  <div id="gearCheckerBody" class="collapsible-content collapsed">
+    <div style="font-size:.78rem;color:var(--text-dim);font-weight:500;margin:.4rem 0 .7rem">Pick your own gear to test if it works with your vending machines. Updates automatically.</div>
+    <div class="gear-grid" id="checkerGrid"></div>
+    <div id="checkerResult" style="margin-top:.8rem"></div>
+  </div>
 </div>
 </div>
 
@@ -234,7 +232,7 @@ const ITEM_DB={
   ],
   weapon:[
     {name:'— No Weapon —',abs:[]},
-    {name:'Vectra Edge',abs:[{k:'lightning_on_attack'},{k:'rage_on_lightning',r:10}]},
+    {name:'Vectra Edge EX',abs:[{k:'lightning_on_attack'},{k:'rage_on_lightning',r:10}]},
     {name:"Sower's Lament",abs:[{k:'magic_knife_on_attack'},{k:'shield_on_hit_5'}]},
     {name:'Scarsteel',abs:[{k:'bolt_on_rage'}]},
     {name:'Cursed Naginata',abs:[{k:'heal_every_2_hits'}]},
@@ -338,35 +336,98 @@ function getActiveAbilities(){
 }
 
 // ======== RENDER ========
-function render(){renderGear();renderShrinePlanner();simulate();}
+function render(){renderShrinePlanner();renderChecker();}
 
-function renderGear(){
-  document.getElementById('gearGrid').innerHTML=SLOTS.map(s=>{
-    const items=ITEM_DB[s.id]||[];const eq=equipped[s.id];const lk=locked[s.id];
-    const eqItem=eq?items.find(i=>i.name===eq):null;
-    return`<div class="slot" style="${lk?'border-color:var(--accent-dark);border-width:2px;background:#fff3d0;':''}">
-      <div class="slot-top">
-        <span class="sn">${s.icon} ${s.name}</span>
-        <label class="lock-label"><input type="checkbox" ${lk?'checked':''} onchange="toggleLock('${s.id}',this.checked)"> 🔒 Lock</label>
-      </div>
-      ${eqItem?``:``}
-      <select onchange="equipItem('${s.id}',this.value)" style="margin-top:.3rem;font-size:.78rem;">
+// ======== GEAR CHECKER ========
+const checkerGear={helm:null,chest:null,neck:null,weapon:null,ring:null,belt:null};
+
+function renderChecker(){
+  const grid=document.getElementById('checkerGrid');
+  if(!grid)return;
+  grid.innerHTML=SLOTS.map(s=>{
+    const items=ITEM_DB[s.id]||[];const eq=checkerGear[s.id];
+    return`<div class="slot">
+      <div class="slot-top"><span class="sn">${s.icon} ${s.name}</span></div>
+      <select onchange="checkerSet('${s.id}',this.value)" style="margin-top:.3rem;font-size:.78rem;">
         <option value="">— Select —</option>
         ${items.map(i=>`<option value="${i.name}"${eq===i.name?' selected':''}>${i.name}  ·  ${descItemText(i)}</option>`).join('')}
       </select>
     </div>`;
   }).join('');
+  runChecker();
 }
 
-function equipItem(sid,name){equipped[sid]=name||null;render();}
-function toggleLock(sid,val){locked[sid]=val;renderGear();}
+function checkerSet(sid,name){checkerGear[sid]=name||null;runChecker();}
+
+function runChecker(){
+  const resultDiv=document.getElementById('checkerResult');
+  if(!resultDiv)return;
+
+  // Collect gear abilities
+  const gAbs=[];
+  let anyGear=false;
+  SLOTS.forEach(s=>{
+    const n=checkerGear[s.id];if(!n)return;
+    const item=ITEM_DB[s.id].find(i=>i.name===n);if(!item)return;
+    anyGear=true;
+    getItemAbs(item).forEach(a=>{const t=AB[a.k];if(!t)return;gAbs.push({name:item.name,trigger:t.trigger,effect:t.effect,rageAmt:a.r||t.defR,hitN:a.hitN||t.hitN,turnN:a.turnN||t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact});});
+  });
+
+  if(!anyGear){resultDiv.innerHTML='<div style="font-size:.78rem;color:var(--text-dim);font-style:italic">Pick gear above to test.</div>';return;}
+
+  // Collect vending abilities (use "Your pick" or best of each shrine — for now use whatever user selected/picked)
+  const sAbs=[];
+  const usedShrines=[];
+  shrinePlan.forEach((shrine,i)=>{
+    const sel=document.getElementById('shrineChoice'+i);
+    let key=sel?sel.value:'';
+    // If auto, pick the first option that exists
+    if(!key){key=shrine.opts.filter(Boolean)[0]||'';}
+    if(!key)return;
+    const t=AB[key];if(!t)return;
+    usedShrines.push(key);
+    sAbs.push({name:t.name+' (vending)',trigger:t.trigger,effect:t.effect,rageAmt:t.defR,hitN:t.hitN,turnN:t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact});
+  });
+
+  // Simulate
+  const turns=simCombat(4,0,[...gAbs,...sAbs],false,1,true,true,false,'maxRA');
+  const t1RA=(turns[0]||{}).ra||0;
+  const t1R=(turns[0]||{}).totalR||0;
+  const isInfinite=t1RA>=30;
+
+  // Poison cleanse detection
+  const freeSlots=['helm','neck','ring'].filter(id=>!checkerGear[id]);
+  const weaponEmpty=!checkerGear.weapon;
+  const ringEmpty=!checkerGear.ring;
+  const over9000=isInfinite&&weaponEmpty&&ringEmpty;
+  const hasPoison=freeSlots.length>0;
+
+  const slotLabels={helm:'Helm',neck:'Neck',ring:'Ring'};
+  const poisonText=hasPoison?freeSlots.map(s=>slotLabels[s]).join(', '):'none';
+
+  let banner='';
+  if(over9000){
+    banner=`<div style="border:2px solid #e84030;background:#ffe8e0;border-radius:8px;padding:.5rem .7rem;font-weight:800;color:#e84030;font-size:.85rem">⚡ OVER 9000 — Infinite rage with Ring+Weapon free for utility. ${t1RA} RAs on T1.</div>`;
+  }else if(isInfinite&&hasPoison){
+    banner=`<div style="border:2px solid #2fb050;background:#e0f4e8;border-radius:8px;padding:.5rem .7rem;font-weight:800;color:#2fb050;font-size:.85rem">✓ Infinite + Poison Cleanse — ${poisonText} free. ${t1RA} RAs on T1.</div>`;
+  }else if(isInfinite){
+    banner=`<div style="border:2px solid #666;background:#f0f0f0;border-radius:8px;padding:.5rem .7rem;font-weight:800;color:#333;font-size:.85rem">∞ Infinite — ${t1RA} RAs on T1. No slot free for poison cleanse.</div>`;
+  }else{
+    banner=`<div style="border:2px solid #e84030;background:#fde8e0;border-radius:8px;padding:.5rem .7rem;font-weight:700;color:#e84030;font-size:.85rem">✗ Not infinite — ${t1RA} RAs on T1 (${t1R} rage generated).</div>`;
+  }
+
+  resultDiv.innerHTML=banner;
+}
+function renderGear(){/* removed in overhaul */}
+function equipItem(sid,name){/* removed */}
+function toggleLock(sid,val){/* removed */}
 
 function renderShrinePlanner(){
-  const count=9;
+  const count=8;
   while(shrinePlan.length<count)shrinePlan.push({opts:['','','']});
   while(shrinePlan.length>count)shrinePlan.pop();
   const div=document.getElementById('shrinePlanner');
-  const excluded=new Set(['magic_knife_every_3_turns','shield_on_turn_4','crit_up_max_hp','critical_recovery','low_hp_defence','second_wind','fill_rage_low_hp','magic_knife_on_crit','knife_doubler','strike_twice','heal_every_2_hits','every_other_add_rage','two_for_two_lightning']);
+  const excluded=new Set(['magic_knife_every_3_turns','shield_on_turn_4','crit_up_max_hp','critical_recovery','low_hp_defence','second_wind','fill_rage_low_hp','magic_knife_on_crit','knife_doubler','strike_twice','heal_every_2_hits','every_other_add_rage','two_for_two_lightning','rage_on_kill','lightning_on_kill','magic_knife_on_kill','heal_on_kill','shield_on_kill','shield_on_hit_5','shield_on_rage','shield_if_low']);
   // Group abilities by effect category
   const groups=[
     {label:'💢 Rage',keys:['rage_on_heal','rage_on_hit_5','rage_on_lightning','rage_on_magic_knife','bonus_rage_on_attack','rage_on_first_turn','rage_on_kill','every_other_add_rage']},
@@ -380,10 +441,10 @@ function renderShrinePlanner(){
     const opts=g.keys.filter(k=>!excluded.has(k)&&AB[k]).map(k=>`<option value="${k}">　 ${AB[k].name}</option>`).join('');
     return opts?`<option disabled>━━━ ${g.label} ━━━</option>${opts}`:'';
   }).join('');
-  div.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:.4rem">${shrinePlan.map((shrine,i)=>{
+  div.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.4rem">${shrinePlan.map((shrine,i)=>{
     const chosen=document.getElementById('shrineChoice'+i);const chosenVal=chosen?chosen.value:'';
     const opts=[0,1,2].map(j=>`<select id="shrineOpt${i}_${j}" onchange="updateShrineOpt(${i},${j},this.value)" style="font-size:.72rem;padding:.25rem .35rem;margin-bottom:.2rem;width:100%"><option value="">— option —</option>${abOpts}</select>`).join('');
-    const pick=`<select id="shrineChoice${i}" onchange="simulate()" style="font-size:.72rem;padding:.25rem .35rem;width:100%;border-color:var(--c-knife);color:var(--c-knife);font-weight:600">
+    const pick=`<select id="shrineChoice${i}" onchange="runChecker()" style="font-size:.72rem;padding:.25rem .35rem;width:100%;border-color:var(--c-knife);color:var(--c-knife);font-weight:600">
       <option value="">— Auto —</option>
       ${[0,1,2].map(j=>{const k=shrine.opts[j];const t=AB[k];return k?`<option value="${k}"${chosenVal===k?' selected':''}>${t?t.name:k}</option>`:'';}).join('')}
     </select>`;
@@ -398,7 +459,7 @@ function updateShrineOpt(i,j,val){
   shrinePlan[i].opts[j]=val;
   const choiceSel=document.getElementById('shrineChoice'+i);
   if(choiceSel){const prev=choiceSel.value;const opts=shrinePlan[i].opts.filter(Boolean);choiceSel.innerHTML='<option value="">— Auto —</option>'+opts.map(k=>{const t=AB[k];return`<option value="${k}"${prev===k?' selected':''}>${t?t.name:k}</option>`;}).join('');}
-  simulate();
+  runChecker();
 }
 
 // ======== SIMULATION ========
@@ -531,134 +592,10 @@ function scoreTurns(turns,optGoal){
 }
 
 // ======== SIMULATE & DISPLAY ========
-function simulate(){
-  const abs=getActiveAbilities();
-  const enemies=4;
-  const dodgeFirst=false;
-  const ignoreKills=true;
-  const oneShot=true;
-  const optGoal='maxRA';
-  const priority2RA=false;
-  const rasPerKill=1;
-  if(abs.length===0){document.getElementById('simStats').innerHTML='';document.getElementById('simProj').innerHTML='<div class="empty">Equip gear or add shrines</div>';document.getElementById('simLog').innerHTML='';return;}
+function simulate(){/* stubbed - Viable Builds list replaces per-turn UI */}
 
-  const turns=simCombat(enemies,0,abs,dodgeFirst,rasPerKill,ignoreKills,oneShot,priority2RA,optGoal);
-  const tRA=turns.reduce((s,t)=>s+t.ra,0),tK=turns.reduce((s,t)=>s+t.kills,0),tRgen=turns.reduce((s,t)=>s+(t.totalR||0),0);
-  const last=turns[turns.length-1]||{};const died=!!last.died,cleared=(last.eLeft||0)===0&&!died;
-  const shieldSurvive=!!last.shieldWin;
-  const fHp=died?0:(last.hp??100);
-  let oc=died?'#e84030':(cleared||shieldSurvive)?'#3ec070':'#f0a838';
-  let ol=died?'☠ DIED':cleared?'✓ CLEARED':shieldSurvive?'🛡 SURVIVED':'⏱ ONGOING';
-
-  const t1RA=(turns[0]||{}).ra||0;
-  // Infinite = fired 40+ RAs on T1 (loop hit simulator safety cap = self-sustaining)
-  const isInfinite=t1RA>=30;
-  // Check if any of helm/neck/ring is empty (available for poison cleanse in CURRENT equipped)
-  const freeSlots=['helm','neck','ring'].filter(id=>{
-    const eq=equipped[id];
-    if(!eq)return true;
-    const item=ITEM_DB[id].find(i=>i.name===eq);
-    return item&&item.abs.length===0;
-  });
-  // If optimizer ran, also list slots that COULD be free while still infinite
-  const viable=window.__viablePoisonSlots||[];
-  const hasPoisonSlot=freeSlots.length>0||viable.length>0;
-  const slotLabel={helm:'Helm',neck:'Neck',ring:'Ring'};
-  let poisonText='✗ NO';
-  if(viable.length>0){
-    poisonText='✓ '+viable.map(s=>slotLabel[s]).join(', ');
-  }else if(freeSlots.length>0){
-    poisonText='✓ '+freeSlots.map(s=>slotLabel[s]).join(', ');
-  }
-
-  // Over 9000: infinite rage AND both ring and weapon slots empty (ring for poison cleanse, weapon free)
-  const weaponEmpty=(()=>{
-    const eq=equipped.weapon;
-    if(!eq)return true;
-    const item=ITEM_DB.weapon.find(i=>i.name===eq);
-    return item&&item.abs.length===0;
-  })();
-  const ringEmpty=(()=>{
-    const eq=equipped.ring;
-    if(!eq)return true;
-    const item=ITEM_DB.ring.find(i=>i.name===eq);
-    return item&&item.abs.length===0;
-  })();
-  const over9000=isInfinite&&weaponEmpty&&ringEmpty;
-  const over9000Text=over9000?'✓ YES':'✗ NO';
-
-  const wantDodgeSafeUI=document.getElementById('avoidNoHit')?.checked||false;
-  // Dodge safe: build has no risky on-hit abilities (lightning on-hit is safe)
-  const dodgeSafe=(()=>{
-    for(const a of abs){if(a.trigger==='hit'&&a.effect!=='lightning')return false;}
-    return true;
-  })();
-  const dodgeText=dodgeSafe?'✓ YES':'✗ NO';
-
-  const t1Rgen=(turns[0]||{}).totalR||0;
-
-  document.getElementById('simStats').innerHTML=`
-    <div class="stat-box" style="background:${isInfinite?'#e0f4e8':'#fde8e0'};border-color:${isInfinite?'#3ec070':'#e84030'}"><div class="sv" style="color:${isInfinite?'#3ec070':'#e84030'};font-size:1rem">${isInfinite?'✓ YES':'✗ NO'}</div><div class="sla" style="color:${isInfinite?'#3ec070':'#e84030'}">Infinite Rage</div></div>
-    <div class="stat-box" style="background:${hasPoisonSlot?'#e0f4e8':'#fde8e0'};border-color:${hasPoisonSlot?'#3ec070':'#e84030'}"><div class="sv" style="color:${hasPoisonSlot?'#3ec070':'#e84030'};font-size:1rem">${poisonText}</div><div class="sla" style="color:${hasPoisonSlot?'#3ec070':'#e84030'}">Poison Cleanse Slot</div></div>
-    ${wantDodgeSafeUI?`<div class="stat-box" style="background:${dodgeSafe?'#e0f4e8':'#fde8e0'};border-color:${dodgeSafe?'#3ec070':'#e84030'}"><div class="sv" style="color:${dodgeSafe?'#3ec070':'#e84030'};font-size:1rem">${dodgeText}</div><div class="sla" style="color:${dodgeSafe?'#3ec070':'#e84030'}">Dodge-Safe</div></div>`:''}
-    <div class="stat-box ${over9000?'over9000-glow':''}" style="background:${over9000?'#dcffe0':'#fde8e0'};border-color:${over9000?'#2fb050':'#e84030'};border-width:${over9000?'2.5px':'1.5px'}"><div class="sv" style="color:${over9000?'#2fb050':'#e84030'};font-size:1rem;${over9000?'text-shadow:0 0 8px #6ee88a':''}">${over9000Text}</div><div class="sla" style="color:${over9000?'#2fb050':'#e84030'};font-weight:700">Over 9000</div></div>
-    <div class="stat-box" style="background:#fef3d8;border-color:#e8a838"><div class="sv" style="color:#c8783a;font-size:1rem">${t1Rgen}</div><div class="sla" style="color:#c8783a">Rage / Turn</div></div>`;
-
-  let cumKills=0;
-  document.getElementById('simProj').innerHTML=turns.map(t=>{
-    const pct=Math.min(100,(t.endR/100)*100);
-    cumKills+=t.kills||0;
-    const hpColor=t.hp>50?'#3ec070':t.hp>20?'#f0a838':'#e84030';
-    const killBadge=t.kills>0?`<span style="font-size:.75rem;font-weight:700;color:#e84030">💀 Killed ${t.kills} → ${cumKills}/${enemies} total</span>`:'';
-    const hitBadge=t.dmg>0
-      ?`<span style="font-size:.75rem;font-weight:700;color:#e84030;background:#fde8e0;padding:2px 8px;border-radius:20px">⚠ Hit! −${t.dmg}% HP${t.blocked>0?` (🛡×${t.blocked} blocked)`:''}</span>`
-      :t.shieldWin?`<span style="font-size:.75rem;font-weight:700;color:#3ec070;background:#e0f4e8;padding:2px 8px;border-radius:20px">🛡 Shield absorbed last hit</span>`
-      :t.eLeft>0?'':`<span style="font-size:.75rem;font-weight:600;color:#3ec070">✓ No hit — all enemies dead</span>`;
-    const allDead=t.eLeft===0&&!t.died;
-    return`<div class="turn-row ${t.ra>0?'has-rage':''}" style="${t.died?'border-color:#e84030;background:#fde8e0;':allDead?'border-color:#3ec070;':''}">
-      <div class="tl">T${t.turn}<br><span style="color:var(--c-rage);font-size:.65rem">⚔${t.ra}RA</span></div>
-      <div>
-        <div class="tb" style="margin-bottom:.25rem"><div class="tbf" style="width:${pct}%"></div><div class="tbt">${t.startR}→+${t.totalR}→${t.endR}</div></div>
-        <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-          ${killBadge}
-          ${hitBadge}
-          <span style="font-size:.75rem;font-weight:700;color:${hpColor}">❤ ${t.hp}% HP</span>
-          ${t.eLeft>0&&!t.died?`<span style="font-size:.72rem;color:var(--text-dim)">${t.eLeft} enemies remaining</span>`:''}
-        </div>
-      </div>
-      <div></div>
-    </div>`;
-  }).join('');
-
-  // Build Details: show only active shrines
-  const buildDiv=document.getElementById('simBuild');
-  const activeShrines=shrinePlan.map((_,i)=>{const sel=document.getElementById('shrineChoice'+i);return sel&&sel.value?{idx:i,key:sel.value}:null;}).filter(Boolean);
-  if(activeShrines.length===0){
-    buildDiv.innerHTML='<div class="empty">No shrine abilities selected</div>';
-  }else{
-    buildDiv.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:.35rem;padding:.3rem 0">${
-      activeShrines.map(({key})=>{
-        const t=AB[key];if(!t)return'';
-        return`<span class="ability-tag" style="font-size:.68rem;padding:3px 9px 3px 4px">${icoFor(t.effect)}<span>${t.name.replace(' (vending)','')}</span></span>`;
-      }).join('')
-    }</div>`;
-  }
-
-  const t1log=turns[0]?turns[0].log:null;const logDiv=document.getElementById('simLog');
-  if(!t1log||!t1log.length){logDiv.innerHTML='<div class="empty">No events</div>';return;}
-  logDiv.innerHTML=t1log.map(e=>{
-    if(e.t==='header')return`<div class="cd">— ${e.a} —</div>`;
-    if(e.t==='rage')return`<div class="cs"><span>${e.a}</span><span class="rd">+${e.d}→${e.r}</span></div>`;
-    if(e.t==='event')return`<div class="cs"><span>${e.a}</span></div>`;
-    if(e.t==='ra')return`<div class="cs cre"><span>${e.a}</span><span class="rd">rage→${e.r}</span></div>`;
-    return'';
-  }).join('');
-}
-
-// ======== OPTIMIZER ========
+// ======== OPTIMIZER (Viable Builds List) ========
 function optimize(){
-  // Reset all shrine "Your pick" dropdowns to auto so optimizer chooses freely
-  shrinePlan.forEach((_,i)=>{const sel=document.getElementById('shrineChoice'+i);if(sel)sel.value='';});
   const enemies=4;
   const dodgeFirst=false;
   const ignoreKills=true;
@@ -666,158 +603,300 @@ function optimize(){
   const optGoal='maxRA';
   const priority2RA=false;
   const rasPerKill=1;
-  const poisonMode=true; // always try
-  const resultDiv=document.getElementById('optResult');
-
-  // Run twice: first pass with avoidNoHit=true, second pass with false
-  // If first pass finds an infinite build, use it. Otherwise fall back to second pass.
-  let overallBest = {score:-Infinity, gear:null, shrineKeys:null, turns:null, forcedEmpty:null, perSlot:{}, dodgeSafe:false};
-
   const wantDodgeSafe=document.getElementById('avoidNoHit')?.checked||false;
-  const passesToRun=wantDodgeSafe?[true, false]:[false];
+  const listDiv=document.getElementById('buildsList');
 
-  for(const avoidNoHitPass of passesToRun){
-    // If first pass (dodge-safe) found any viable build, skip fallback pass
-    if(!avoidNoHitPass && overallBest.gear) break;
-    const avoidNoHit=avoidNoHitPass;
+  const isRiskyOnHit=k=>{const t=AB[k];if(!t)return false;if(t.trigger!=='hit')return false;return t.effect!=='lightning';};
+  const isRageUseful=a=>{const t=AB[a.k];if(!t)return false;return!t.noImpact&&t.effect!=='none'&&t.effect!=='shield';};
+  const itemHasOnHit=it=>getItemAbs(it).some(a=>{const t=AB[a.k];return t&&t.trigger==='hit'&&t.effect!=='lightning';});
+  const shrineAbs=k=>{const t=AB[k];if(!t)return null;return{name:t.name+' (vending)',trigger:t.trigger,effect:t.effect,rageAmt:t.defR,hitN:t.hitN,turnN:t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact};};
 
-  // Search combinations: try no reservation, single slot reserved, and combos (ring+weapon for over 9000)
-  const poisonSlotsToTry = poisonMode ? [null, 'helm', 'neck', 'ring', 'ring+weapon'] : [null];
+  // Show searching...
+  listDiv.innerHTML='<div class="empty" style="padding:1.5rem;text-align:center;color:var(--text-dim)">Searching…</div>';
 
-  for(const forceEmpty of poisonSlotsToTry){
-    const forcedSlots=forceEmpty?forceEmpty.split('+'):[];
-    // Respect locked slots
-    const slotItems=SLOTS.map(s=>{
-      if(locked[s.id]&&equipped[s.id]){
-        const item=ITEM_DB[s.id].find(i=>i.name===equipped[s.id]);
-        return item?[item]:[null];
-      }
-      // If forcing this slot empty, only allow the No-X option
-      if(forcedSlots.includes(s.id)){
-        const empty=ITEM_DB[s.id].find(i=>i.abs.length===0);
-        return empty?[empty]:[null];
-      }
-      return ITEM_DB[s.id].length>0?ITEM_DB[s.id]:[null];
-    });
+  setTimeout(()=>{
+    // Collect infinite builds across all forced-empty configurations
+    const foundBuilds=[]; // {gear, shrineKeys, t1RA, forcedEmpty}
+    const seen=new Set(); // dedupe by gear+shrine signature
 
-    // Filter out knife-based on-hit abilities in shrine combos when avoidNoHit enabled
-    // (lightning on-hit is safe, only knife/heal/rage on-hit can miss)
-    const isRiskyOnHit=k=>{const t=AB[k];if(!t)return false;if(t.trigger!=='hit')return false;return t.effect!=='lightning';};
-    const shrineCombos=[];
-    function buildShrineCombos(idx,current){
-      if(idx>=shrinePlan.length){shrineCombos.push(current.slice());return;}
-      const shrine=shrinePlan[idx];
-      const manualChoice=document.getElementById('shrineChoice'+idx);
-      if(manualChoice&&manualChoice.value){current.push(manualChoice.value);buildShrineCombos(idx+1,current);current.pop();}
-      else{
-        let opts=shrine.opts.filter(Boolean);
-        if(avoidNoHit)opts=opts.filter(k=>!isRiskyOnHit(k));
-        if(opts.length===0){current.push(null);buildShrineCombos(idx+1,current);current.pop();}
-        else{opts.forEach(k=>{current.push(k);buildShrineCombos(idx+1,current);current.pop();});
-          // Also allow choosing nothing from this shrine so we can skip risky ones
-          if(avoidNoHit){current.push(null);buildShrineCombos(idx+1,current);current.pop();}
+    const passesToRun=wantDodgeSafe?[true, false]:[false];
+    for(const avoidNoHit of passesToRun){
+      // If dodge-safe first pass found builds, don't run fallback
+      if(!avoidNoHit && foundBuilds.length>0) break;
+
+      // Build shrine combos respecting user's manual picks
+      const shrineCombos=[];
+      function buildShrineCombos(idx,current){
+        if(idx>=shrinePlan.length){shrineCombos.push(current.slice());return;}
+        const shrine=shrinePlan[idx];
+        const manualChoice=document.getElementById('shrineChoice'+idx);
+        if(manualChoice&&manualChoice.value){current.push(manualChoice.value);buildShrineCombos(idx+1,current);current.pop();}
+        else{
+          let opts=shrine.opts.filter(Boolean);
+          if(avoidNoHit)opts=opts.filter(k=>!isRiskyOnHit(k));
+          if(opts.length===0){current.push(null);buildShrineCombos(idx+1,current);current.pop();}
+          else{
+            opts.forEach(k=>{current.push(k);buildShrineCombos(idx+1,current);current.pop();});
+            current.push(null);buildShrineCombos(idx+1,current);current.pop();
+          }
         }
       }
-    }
-    buildShrineCombos(0,[]);
-    if(shrineCombos.length===0)shrineCombos.push([]);
+      buildShrineCombos(0,[]);
+      if(shrineCombos.length===0)shrineCombos.push([]);
 
-    // Filter items by goal relevance
-    const isRageUseful=a=>{const t=AB[a.k];if(!t)return false;return!t.noImpact&&t.effect!=='none'&&t.effect!=='shield';};
-    const itemHasOnHit=it=>getItemAbs(it).some(a=>{const t=AB[a.k];return t&&t.trigger==='hit'&&t.effect!=='lightning';});
-    const filteredSlotItems=slotItems.map((items,i)=>{
-      if(locked[SLOTS[i].id])return items;
-      let filtered=items;
-      if(avoidNoHit)filtered=filtered.filter(it=>it.abs.length===0||!itemHasOnHit(it));
-      if(optGoal==='maxRA'){
-        const useful=filtered.filter(it=>it.abs.length===0||getItemAbs(it).some(isRageUseful));
-        filtered=useful.length>0?useful:filtered;
-      }
-      return filtered.length>0?filtered:items;
-    });
+      // Try each poison-slot config: null (no restriction), helm, neck, ring, ring+weapon
+      const configsToTry=[null,'helm','neck','ring','ring+weapon'];
+      for(const forceEmpty of configsToTry){
+        const forcedSlots=forceEmpty?forceEmpty.split('+'):[];
+        const slotItems=SLOTS.map(s=>{
+          if(forcedSlots.includes(s.id)){
+            const empty=ITEM_DB[s.id].find(i=>i.abs.length===0);
+            return empty?[empty]:[null];
+          }
+          let items=ITEM_DB[s.id].length>0?ITEM_DB[s.id]:[null];
+          if(avoidNoHit)items=items.filter(it=>!it||it.abs.length===0||!itemHasOnHit(it));
+          const useful=items.filter(it=>!it||it.abs.length===0||getItemAbs(it).some(isRageUseful));
+          return useful.length>0?useful:items;
+        });
 
-    const shrineAbs=k=>{const t=AB[k];if(!t)return null;return{name:t.name+' (vending)',trigger:t.trigger,effect:t.effect,rageAmt:t.defR,hitN:t.hitN,turnN:t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact};};
-
-    let localBest={score:-Infinity,gear:null,shrineKeys:null,turns:null};
-    for(const shrineKeys of shrineCombos){
-      const sAbs=shrineKeys.filter(Boolean).map(shrineAbs).filter(Boolean);
-      function combine(idx,cur){
-        if(idx===SLOTS.length){
-          const gAbs=[];cur.forEach(it=>{if(!it)return;getItemAbs(it).forEach(a=>{const t=AB[a.k];if(!t)return;gAbs.push({name:it.name,trigger:t.trigger,effect:t.effect,rageAmt:a.r||t.defR,hitN:a.hitN||t.hitN,turnN:a.turnN||t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact});});});
-          const turns=simCombat(enemies,0,[...gAbs,...sAbs],dodgeFirst,rasPerKill,ignoreKills,oneShot,priority2RA,optGoal);
-          const score=scoreTurns(turns,optGoal);
-          if(score>localBest.score){localBest={score,gear:cur.slice(),shrineKeys:shrineKeys.slice(),turns};}
-          return;
+        for(const shrineKeys of shrineCombos){
+          const sAbs=shrineKeys.filter(Boolean).map(shrineAbs).filter(Boolean);
+          function combine(idx,cur){
+            if(idx===SLOTS.length){
+              const gAbs=[];cur.forEach(it=>{if(!it)return;getItemAbs(it).forEach(a=>{const t=AB[a.k];if(!t)return;gAbs.push({name:it.name,trigger:t.trigger,effect:t.effect,rageAmt:a.r||t.defR,hitN:a.hitN||t.hitN,turnN:a.turnN||t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact});});});
+              const turns=simCombat(enemies,0,[...gAbs,...sAbs],dodgeFirst,rasPerKill,ignoreKills,oneShot,priority2RA,optGoal);
+              const t1RA=(turns[0]||{}).ra||0;
+              if(t1RA>=30){
+                // Signature for dedupe
+                const gearNames=cur.map(it=>it?it.name:'—').join('|');
+                const shrineSig=[...shrineKeys].sort().join('|');
+                const sig=gearNames+'||'+shrineSig+'||'+(forceEmpty||'');
+                if(!seen.has(sig)){
+                  seen.add(sig);
+                  foundBuilds.push({gear:cur.slice(),shrineKeys:shrineKeys.slice(),t1RA,forcedEmpty:forceEmpty,turns});
+                }
+              }
+              return;
+            }
+            for(const it of slotItems[idx]){cur.push(it);combine(idx+1,cur);cur.pop();}
+          }
+          combine(0,[]);
         }
-        for(const it of filteredSlotItems[idx]){cur.push(it);combine(idx+1,cur);cur.pop();}
       }
-      combine(0,[]);
+    } // end pass loop
+
+    // Categorize builds into tiers
+    const tierOver9000=[];    // ring+weapon both empty
+    const tierPoisonSafe=[];  // any of helm/neck/ring empty (but not both ring+weapon)
+    const tierPlain=[];       // no forced empty slot (or forced slot didn't provide poison safety)
+
+    for(const b of foundBuilds){
+      if(b.forcedEmpty==='ring+weapon') tierOver9000.push(b);
+      else if(b.forcedEmpty && ['helm','neck','ring'].includes(b.forcedEmpty)) tierPoisonSafe.push(b);
+      else tierPlain.push(b);
     }
 
-    if(localBest.gear){
-      const t1RA=(localBest.turns[0]||{}).ra||0;
-      const infinite=t1RA>=30;
-      const hasPoisonSlot=forceEmpty!==null;
-      const isOver9000=infinite && forceEmpty==='ring+weapon';
-      // Track result for each attempted slot
-      overallBest.perSlot[forceEmpty===null?'none':forceEmpty]={
-        gear:localBest.gear,
-        shrineKeys:localBest.shrineKeys,
-        turns:localBest.turns,
-        score:localBest.score,
-        t1RA,
-        infinite,
-      };
-      // Ranking: over 9000 > infinite+poison > infinite > non-infinite+poison > non-infinite
-      const tier = (isOver9000?4:0) + (infinite?2:0) + (hasPoisonSlot?1:0);
-      const bestIsOver9000 = overallBest.infinite && overallBest.forcedEmpty==='ring+weapon';
-      const bestTier = (bestIsOver9000?4:0) + (overallBest.infinite?2:0) + (overallBest.hasPoisonSlot?1:0);
-      if(tier>bestTier || (tier===bestTier && localBest.score>overallBest.score)){
-        overallBest={...overallBest,gear:localBest.gear,shrineKeys:localBest.shrineKeys,turns:localBest.turns,score:localBest.score,forcedEmpty:forceEmpty,infinite,hasPoisonSlot,dodgeSafe:avoidNoHit};
+    // Sort each tier by RA descending, then group by weapon, keep top 3 per weapon
+    const sortDesc=(a,b)=>b.t1RA-a.t1RA;
+    tierOver9000.sort(sortDesc);
+    tierPoisonSafe.sort(sortDesc);
+    tierPlain.sort(sortDesc);
+
+    // Group by weapon slot (index 3 in SLOTS), keep top 3 per weapon
+    function groupByWeapon(builds){
+      const groups={};
+      const order=[];
+      for(const b of builds){
+        const w=b.gear[3];
+        const key=w?w.name:'— No Weapon —';
+        if(!groups[key]){groups[key]=[]; order.push(key);}
+        if(groups[key].length<3)groups[key].push(b);
+      }
+      // Flatten in order
+      const out=[];
+      for(const k of order){out.push(...groups[k]);}
+      return out;
+    }
+
+    const top9000=groupByWeapon(tierOver9000);
+    // Poison: split by slot first, then group each slot by weapon (top 3)
+    const topPoisonBySlot={helm:[],neck:[],ring:[]};
+    for(const slotKey of ['helm','neck','ring']){
+      const bySlot=tierPoisonSafe.filter(b=>b.forcedEmpty===slotKey);
+      topPoisonBySlot[slotKey]=groupByWeapon(bySlot);
+    }
+    const anyPoisonBuilds=Object.values(topPoisonBySlot).some(a=>a.length>0);
+    // Only show plain infinite if no better tier has any builds
+    const topPlain=(top9000.length>0||anyPoisonBuilds)?[]:groupByWeapon(tierPlain);
+
+    // Render
+    if(top9000.length===0 && !anyPoisonBuilds && topPlain.length===0){
+      listDiv.innerHTML='<div class="empty" style="padding:1.5rem;text-align:center;color:var(--text-dim);font-style:italic">No infinite builds possible with current vending machines. Try adding more options or different abilities.</div>';
+      return;
+    }
+
+    const slotIcons={helm:'🪖',chest:'🛡',neck:'🔱',weapon:'⚔',ring:'💍',belt:'👑'};
+    function renderBuild(build, tier){
+      const borderColor=tier==='over9000'?'#e84030':tier==='poison'?'#3ec070':'#999';
+      const tierLabel=tier==='over9000'?'⚡ Over 9000':tier==='poison'?'✓ Poison Cleanse':'∞ Infinite';
+      const tierColor=tier==='over9000'?'#e84030':tier==='poison'?'#2fb050':'#666';
+
+      // Compact gear list
+      const gearParts=build.gear.map((it,i)=>{
+        const slot=SLOTS[i];
+        const isEmpty=!it||it.abs.length===0;
+        const name=isEmpty?`Any ${slot.name}`:it.name;
+        return`<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.72rem;padding:.15rem .35rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:4px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'}"><span style="font-size:.85em">${slot.icon}</span>${name}</span>`;
+      }).join(' ');
+
+      // Vending abilities used
+      const vendPills=build.shrineKeys.filter(Boolean).map(k=>{
+        const t=AB[k];if(!t)return'';
+        return`<span class="ability-tag" style="font-size:.65rem;padding:2px 7px 2px 3px">${icoFor(t.effect)}<span>${t.name}</span></span>`;
+      }).join(' ');
+
+      // Poison note (which slot is free)
+      let poisonNote='';
+      if(build.forcedEmpty){
+        const slotLabel={helm:'Helm',neck:'Neck',ring:'Ring','ring+weapon':'Ring + Weapon'};
+        poisonNote=`<span style="font-size:.7rem;color:${tierColor};font-weight:700;margin-left:.4rem">🧪 ${slotLabel[build.forcedEmpty]} free</span>`;
+      }
+
+      return`<div style="border:2px solid ${borderColor};border-radius:10px;padding:.55rem .7rem;margin-bottom:.5rem;background:#fdfaf3">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
+            <span style="font-size:.72rem;font-weight:800;color:${tierColor};letter-spacing:.03em">${tierLabel}</span>
+            ${poisonNote}
+          </div>
+          <span style="font-size:.85rem;font-weight:800;color:${tierColor}">${build.t1RA} RAs</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.35rem">${gearParts}</div>
+        ${vendPills?`<div style="display:flex;flex-wrap:wrap;gap:.2rem">${vendPills}</div>`:''}
+      </div>`;
+    }
+
+    // Helper: render a group of builds sharing the same vending picks
+    function renderVendingGroup(builds, tier){
+      if(builds.length===0)return '';
+      const borderColor=tier==='over9000'?'#e84030':tier==='poison'?'#3ec070':'#999';
+      const tierColor=tier==='over9000'?'#e84030':tier==='poison'?'#2fb050':'#666';
+      const tierLabel=tier==='over9000'?'⚡ OVER 9000':tier==='poison'?'✓ INFINITE + POISON CLEANSE':'∞ INFINITE';
+
+      // Vending pills
+      const vendPills=builds[0].shrineKeys.filter(Boolean).map(k=>{
+        const t=AB[k];if(!t)return'';
+        return`<span class="ability-tag" style="font-size:.65rem;padding:2px 7px 2px 3px">${icoFor(t.effect)}<span>${t.name}</span></span>`;
+      }).join(' ');
+
+      // Identify constant vs variable slots across all builds in the group
+      const constantSlots=[];
+      const variableSlots=[];
+      SLOTS.forEach((slot,i)=>{
+        const first=builds[0].gear[i];
+        const firstName=first?first.name:null;
+        const allSame=builds.every(b=>{
+          const it=b.gear[i];
+          return (it?it.name:null)===firstName;
+        });
+        if(allSame)constantSlots.push({item:first,slot,idx:i});
+        else variableSlots.push({slot,idx:i});
+      });
+
+      // Pill renderer for a single item
+      function itemPill(item, slot, opts={}){
+        const isEmpty=!item||item.abs.length===0;
+        const name=isEmpty?`Any ${slot.name}`:item.name;
+        const sz=opts.small?'.7rem':'.72rem';
+        return`<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:${sz};padding:.15rem .4rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:4px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'};white-space:nowrap"><span style="font-size:.85em">${slot.icon}</span>${name}</span>`;
+      }
+
+      // BASE column: constants stacked vertically
+      const basePills=constantSlots.map(({item,slot})=>itemPill(item,slot)).join('');
+      const baseCol=constantSlots.length>0?`
+        <div style="min-width:180px;padding:.4rem .55rem;background:#f8f2df;border:1.5px dashed #d0c0a0;border-radius:6px;display:flex;flex-direction:column;gap:.25rem">
+          ${basePills}
+        </div>`:'';
+
+      // Per-build variable rows on the right
+      let variantRows='';
+      if(variableSlots.length===0){
+        variantRows='';
+      }else{
+        variantRows=builds.map(b=>{
+          const varPills=variableSlots.map(({slot,idx})=>itemPill(b.gear[idx],slot)).join(' <span style="color:#c0b090;font-size:.7rem;padding:0 .1rem">+</span> ');
+          return`<div style="display:flex;align-items:center;padding:.3rem 0;flex-wrap:wrap;border-bottom:1px dotted #e0d5b8">
+            <div style="display:flex;flex-wrap:wrap;gap:.15rem;align-items:center">${varPills}</div>
+          </div>`;
+        }).join('');
+      }
+
+      return`<div style="border:2px solid ${borderColor};border-radius:10px;padding:.55rem .7rem;margin-bottom:.6rem;background:#fdfaf3">
+        <div style="display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;margin-bottom:.5rem;padding-bottom:.4rem;border-bottom:1px dashed #d0c0a0">
+          ${vendPills}
+        </div>
+        <div style="display:flex;gap:.6rem;align-items:stretch;flex-wrap:wrap">
+          ${baseCol}
+          <div style="flex:1;min-width:200px;display:flex;flex-direction:column">${variantRows}</div>
+        </div>
+      </div>`;
+    }
+
+    // Render just gear (vending shown at group header)
+    function renderBuildGearOnly(build, tier){
+      const borderColor=tier==='over9000'?'#e84030':tier==='poison'?'#3ec070':'#999';
+      const tierColor=tier==='over9000'?'#e84030':tier==='poison'?'#2fb050':'#666';
+      const gearParts=build.gear.map((it,i)=>{
+        const slot=SLOTS[i];
+        const isEmpty=!it||it.abs.length===0;
+        const name=isEmpty?`Any ${slot.name}`:it.name;
+        return`<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.72rem;padding:.15rem .35rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:4px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'}"><span style="font-size:.85em">${slot.icon}</span>${name}</span>`;
+      }).join(' ');
+      return`<div style="border:2px solid ${borderColor};border-radius:8px;padding:.4rem .55rem;margin-bottom:.35rem;background:#fdfaf3;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
+        <div style="display:flex;flex-wrap:wrap;gap:.25rem;flex:1">${gearParts}</div>
+        <span style="font-size:.8rem;font-weight:800;color:${tierColor};white-space:nowrap">${build.t1RA} RAs</span>
+      </div>`;
+    }
+
+    // Given a list of builds, group by unique vending picks (shrineKeys sorted) and render
+    function renderBuildsGroupedByVending(builds, tier){
+      const groups=new Map();
+      for(const b of builds){
+        const key=[...b.shrineKeys].filter(Boolean).sort().join('|');
+        if(!groups.has(key))groups.set(key,[]);
+        groups.get(key).push(b);
+      }
+      // Render each vending group
+      let out='';
+      for(const groupBuilds of groups.values()){
+        out += renderVendingGroup(groupBuilds, tier);
+      }
+      return out;
+    }
+
+    let html='';
+    if(top9000.length>0){
+      html+='<div style="font-size:.72rem;font-weight:800;color:#e84030;letter-spacing:.08em;margin:.3rem 0 .3rem">⚡ OVER 9000</div>';
+      html+=renderBuildsGroupedByVending(top9000,'over9000');
+    }
+    if(anyPoisonBuilds){
+      const slotOrder=['helm','neck','ring'];
+      const slotLabels={helm:'HELM',neck:'NECK',ring:'RING'};
+      for(const slotKey of slotOrder){
+        const bySlot=topPoisonBySlot[slotKey];
+        if(bySlot.length===0)continue;
+        html+=`<div style="font-size:.72rem;font-weight:800;color:#2fb050;letter-spacing:.08em;margin:.6rem 0 .3rem">✓ INFINITE + POISON CLEANSE — ${slotLabels[slotKey]}</div>`;
+        html+=renderBuildsGroupedByVending(bySlot,'poison');
       }
     }
-  } // end poisonSlotsToTry loop
+    if(topPlain.length>0){
+      html+='<div style="font-size:.72rem;font-weight:800;color:#666;letter-spacing:.08em;margin:.6rem 0 .3rem">∞ INFINITE</div>';
+      html+=renderBuildsGroupedByVending(topPlain,'plain');
+    }
 
-  } // end avoidNoHitPass loop
-
-  const bestGear=overallBest.gear;
-  const bestShrineKeys=overallBest.shrineKeys;
-  const bestTurns=overallBest.turns;
-
-  if(!bestGear){resultDiv.innerHTML='<div class="empty">No valid build</div>';return;}
-
-  SLOTS.forEach((s,i)=>{if(!locked[s.id])equipped[s.id]=bestGear[i]?bestGear[i].name:null;});
-  bestShrineKeys.forEach((k,i)=>{const sel=document.getElementById('shrineChoice'+i);if(sel&&k)sel.value=k;});
-  render();
-
-  // Detect infinite: at least 3 RAs on turn 1
-  const t1RA=(bestTurns&&bestTurns[0])?bestTurns[0].ra:0;
-  const isInfinite=t1RA>=30;
-  const lockedSlots=SLOTS.filter(s=>locked[s.id]).map(s=>s.name);
-  const slotLabel={helm:'Helm',neck:'Neck',ring:'Ring'};
-
-  // Collect all slots where infinite is achievable
-  const viablePoisonSlots=['helm','neck','ring'].filter(s=>overallBest.perSlot[s]&&overallBest.perSlot[s].infinite);
-  const anyInfinite=isInfinite||viablePoisonSlots.length>0;
-
-  let msg='';
-  if(isInfinite && viablePoisonSlots.length>0){
-    msg=`<div style="font-size:.88rem;color:#3a8a3a;font-weight:700">✓ Infinite rage available with poison cleanse in: ${viablePoisonSlots.map(s=>slotLabel[s]).join(', ')}</div><div style="font-size:.76rem;color:#c85030;font-weight:600;margin-top:.3rem;padding:.4rem .55rem;background:#fdf1e0;border-left:3px solid #f0a838;border-radius:4px">⚠ Don't just swap in a poison cleanse item — that can break the loop. Instead: in the gear planner, set the slot to "— No [slot] —", check its Lock box, and hit Find Best Build again. The optimizer will rebuild around the reserved slot, then you can equip poison cleanse there in-game.</div>`;
-  }else if(anyInfinite && viablePoisonSlots.length===0){
-    msg=`<div style="font-size:.88rem;color:#c85030;font-weight:700">⚠ Infinite rage found, but not compatible with reserving Helm/Neck/Ring for poison cleanse.</div>`;
-  }else if(viablePoisonSlots.length>0){
-    msg=`<div style="font-size:.88rem;color:#3a8a3a;font-weight:700">✓ Infinite rage available with poison cleanse in: ${viablePoisonSlots.map(s=>slotLabel[s]).join(', ')}</div><div style="font-size:.76rem;color:#c85030;font-weight:600;margin-top:.3rem;padding:.4rem .55rem;background:#fdf1e0;border-left:3px solid #f0a838;border-radius:4px">⚠ Don't just swap in a poison cleanse item — that can break the loop. Instead: in the gear planner, set the slot to "— No [slot] —", check its Lock box, and hit Find Best Build again. The optimizer will rebuild around the reserved slot, then you can equip poison cleanse there in-game.</div>`;
-  }else{
-    msg=`<div style="font-size:.88rem;color:#c85030;font-weight:700">⚠ No infinite build possible. Best attempt: ${t1RA} RA(s) on T1.</div>`;
-  }
-
-  // Expose viable slots so simulate() can show them in the badge
-  window.__viablePoisonSlots=viablePoisonSlots;
-  window.__optimizerRan=true;
-
-  resultDiv.innerHTML=`${msg}<div style="font-size:.74rem;color:var(--text-dim);font-style:italic;font-weight:500;margin-top:.2rem">${lockedSlots.length>0?'Locked: '+lockedSlots.join(', '):''}</div>`;
-  simulate();
+    listDiv.innerHTML=html;
+  },30); // setTimeout so "Searching…" renders first
 }
+
 
 // ======== VENDING IMPORT ========
 function importShrines(){
@@ -898,8 +977,8 @@ function importShrines(){
   if(shrines.length===0){msg.textContent='⚠ No M1/M2... lines found';return;}
 
   // Fill gaps
-  // Pad up to 9 vending machines
-  const target=9;
+  // Pad up to 8 vending machines
+  const target=8;
   for(let i=0;i<target;i++)if(!shrines[i])shrines[i]={opts:['','','']};
   const filled=shrines.filter(s=>s.opts.some(Boolean)).length;
 
