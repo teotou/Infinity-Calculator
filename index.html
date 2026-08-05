@@ -788,55 +788,27 @@ function optimize(){
         return`<span class="ability-tag" style="font-size:.65rem;padding:2px 7px 2px 3px">${icoFor(t.effect)}<span>${t.name}</span></span>`;
       }).join(' ');
 
-      // Identify constant vs variable slots across all builds in the group
-      const constantSlots=[];
-      const variableSlots=[];
-      SLOTS.forEach((slot,i)=>{
-        const first=builds[0].gear[i];
-        const firstName=first?first.name:null;
-        const allSame=builds.every(b=>{
-          const it=b.gear[i];
-          return (it?it.name:null)===firstName;
-        });
-        if(allSame)constantSlots.push({item:first,slot,idx:i});
-        else variableSlots.push({slot,idx:i});
-      });
-
-      // Pill renderer for a single item
-      function itemPill(item, slot, opts={}){
+      // Row renderer for a single item (stacked layout)
+      function itemRow(item, slot){
         const isEmpty=!item||item.abs.length===0;
         const name=isEmpty?`Any ${slot.name}`:item.name;
-        const sz=opts.small?'.7rem':'.72rem';
-        return`<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:${sz};padding:.15rem .4rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:4px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'};white-space:nowrap"><span style="font-size:.85em">${slot.icon}</span>${name}</span>`;
+        return`<div style="display:flex;align-items:center;gap:.35rem;padding:.25rem .5rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:5px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'};font-size:.75rem;white-space:nowrap"><span style="font-size:.9em">${slot.icon}</span>${name}</div>`;
       }
 
-      // BASE column: constants stacked vertically
-      const basePills=constantSlots.map(({item,slot})=>itemPill(item,slot)).join('');
-      const baseCol=constantSlots.length>0?`
-        <div style="min-width:180px;padding:.4rem .55rem;background:#f8f2df;border:1.5px dashed #d0c0a0;border-radius:6px;display:flex;flex-direction:column;gap:.25rem">
-          ${basePills}
-        </div>`:'';
-
-      // Per-build variable rows on the right
-      let variantRows='';
-      if(variableSlots.length===0){
-        variantRows='';
-      }else{
-        variantRows=builds.map(b=>{
-          const varPills=variableSlots.map(({slot,idx})=>itemPill(b.gear[idx],slot)).join(' <span style="color:#c0b090;font-size:.7rem;padding:0 .1rem">+</span> ');
-          return`<div style="display:flex;align-items:center;padding:.3rem 0;flex-wrap:wrap;border-bottom:1px dotted #e0d5b8">
-            <div style="display:flex;flex-wrap:wrap;gap:.15rem;align-items:center">${varPills}</div>
-          </div>`;
-        }).join('');
-      }
+      // Each build gets its own box with all slots stacked vertically
+      const buildBoxes=builds.map(b=>{
+        const rows=SLOTS.map((slot,i)=>itemRow(b.gear[i],slot)).join('');
+        return`<div style="min-width:180px;padding:.4rem .55rem;background:#f8f2df;border:1.5px dashed #d0c0a0;border-radius:6px;display:flex;flex-direction:column;gap:.25rem">
+          ${rows}
+        </div>`;
+      }).join('');
 
       return`<div style="border:2px solid ${borderColor};border-radius:10px;padding:.55rem .7rem;margin-bottom:.6rem;background:#fdfaf3">
         <div style="display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;margin-bottom:.5rem;padding-bottom:.4rem;border-bottom:1px dashed #d0c0a0">
           ${vendPills}
         </div>
         <div style="display:flex;gap:.6rem;align-items:stretch;flex-wrap:wrap">
-          ${baseCol}
-          <div style="flex:1;min-width:200px;display:flex;flex-direction:column">${variantRows}</div>
+          ${buildBoxes}
         </div>
       </div>`;
     }
