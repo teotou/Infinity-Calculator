@@ -395,11 +395,26 @@ function runChecker(){
   const t1R=(turns[0]||{}).totalR||0;
   const isInfinite=t1RA>=30;
 
-  // Poison cleanse detection
-  const freeSlots=['helm','neck','ring'].filter(id=>!checkerGear[id]);
-  const weaponEmpty=!checkerGear.weapon;
-  const ringEmpty=!checkerGear.ring;
-  const over9000=isInfinite&&weaponEmpty&&ringEmpty;
+  // Poison cleanse detection — test whether the build STAYS infinite if a given
+  // slot's item were swapped out (i.e. its ability removed), regardless of
+  // whether that slot currently has something equipped.
+  function abilitiesWithout(excludeSlotIds){
+    const out=[];
+    SLOTS.forEach(s=>{
+      if(excludeSlotIds.includes(s.id))return;
+      const n=checkerGear[s.id];if(!n)return;
+      const item=ITEM_DB[s.id].find(i=>i.name===n);if(!item)return;
+      getItemAbs(item).forEach(a=>{const t=AB[a.k];if(!t)return;out.push({name:item.name,trigger:t.trigger,effect:t.effect,rageAmt:a.r||t.defR,hitN:a.hitN||t.hitN,turnN:a.turnN||t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact});});
+    });
+    return out;
+  }
+  function stillInfiniteWithout(excludeSlotIds){
+    const turns2=simCombat(4,0,[...abilitiesWithout(excludeSlotIds),...sAbs],false,1,true,true,false,'maxRA');
+    return ((turns2[0]||{}).ra||0)>=30;
+  }
+  const freeSlots=['helm','neck','ring'].filter(id=>stillInfiniteWithout([id]));
+  const weaponRingFree=stillInfiniteWithout(['weapon','ring']);
+  const over9000=isInfinite&&weaponRingFree;
   const hasPoison=freeSlots.length>0;
 
   const slotLabels={helm:'Helm',neck:'Neck',ring:'Ring'};
@@ -788,6 +803,13 @@ function optimize(){
         return`<span class="ability-tag" style="font-size:.65rem;padding:2px 7px 2px 3px">${icoFor(t.effect)}<span>${t.name}</span></span>`;
       }).join(' ');
 
+      // Poison cleanse note — only show the "no slot free" case; the free-slot
+      // case is already conveyed by the section header (e.g. "— HELM")
+      let poisonNote='';
+      if(!builds[0].forcedEmpty&&tier==='plain'){
+        poisonNote=`<span style="font-size:.7rem;color:var(--text-dim);font-weight:700">No slot free for poison cleanse</span>`;
+      }
+
       // Row renderer for a single item (stacked layout)
       function itemRow(item, slot){
         const isEmpty=!item||item.abs.length===0;
@@ -806,6 +828,7 @@ function optimize(){
       return`<div style="border:2px solid ${borderColor};border-radius:10px;padding:.55rem .7rem;margin-bottom:.6rem;background:#fdfaf3">
         <div style="display:flex;flex-wrap:wrap;gap:.3rem;align-items:center;margin-bottom:.5rem;padding-bottom:.4rem;border-bottom:1px dashed #d0c0a0">
           ${vendPills}
+          ${poisonNote}
         </div>
         <div style="display:flex;gap:.6rem;align-items:stretch;flex-wrap:wrap">
           ${buildBoxes}
