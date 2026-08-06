@@ -341,14 +341,19 @@ function render(){renderShrinePlanner();renderChecker();}
 
 // ======== GEAR CHECKER ========
 const checkerGear={helm:null,chest:null,neck:null,weapon:null,ring:null,belt:null};
+const checkerLocked={helm:false,chest:false,neck:false,weapon:false,ring:false,belt:false};
 
 function renderChecker(){
   const grid=document.getElementById('checkerGrid');
   if(!grid)return;
   grid.innerHTML=SLOTS.map(s=>{
-    const items=ITEM_DB[s.id]||[];const eq=checkerGear[s.id];
+    const items=ITEM_DB[s.id]||[];const eq=checkerGear[s.id];const locked=checkerLocked[s.id];
     return`<div class="slot">
-      <div class="slot-top"><span class="sn">${s.icon} ${s.name}</span></div>
+      <div class="slot-top"><span class="sn">${s.icon} ${s.name}</span>
+        <label style="display:flex;align-items:center;gap:.2rem;cursor:pointer;font-size:.68rem;color:var(--text-dim);font-weight:700;margin-left:auto" title="Lock this item so Find Builds always uses it">
+          <input type="checkbox" onchange="checkerSetLock('${s.id}',this.checked)" ${locked?'checked':''} style="width:auto;accent-color:var(--accent)"> 🔒
+        </label>
+      </div>
       <select onchange="checkerSet('${s.id}',this.value)" style="margin-top:.3rem;font-size:.78rem;">
         <option value="">— Select —</option>
         ${items.map(i=>`<option value="${i.name}"${eq===i.name?' selected':''}>${i.name}  ·  ${descItemText(i)}</option>`).join('')}
@@ -358,7 +363,8 @@ function renderChecker(){
   runChecker();
 }
 
-function checkerSet(sid,name){checkerGear[sid]=name||null;runChecker();}
+function checkerSet(sid,name){checkerGear[sid]=name||null;if(!name)checkerLocked[sid]=false;runChecker();}
+function checkerSetLock(sid,locked){checkerLocked[sid]=locked&&!!checkerGear[sid];renderChecker();}
 
 function runChecker(){
   const resultDiv=document.getElementById('checkerResult');
@@ -460,10 +466,13 @@ function renderShrinePlanner(){
   div.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.4rem">${shrinePlan.map((shrine,i)=>{
     const chosen=document.getElementById('shrineChoice'+i);const chosenVal=chosen?chosen.value:'';
     const opts=[0,1,2].map(j=>`<select id="shrineOpt${i}_${j}" onchange="updateShrineOpt(${i},${j},this.value)" style="font-size:.72rem;padding:.25rem .35rem;margin-bottom:.2rem;width:100%"><option value="">— option —</option>${abOpts}</select>`).join('');
-    const pick=`<select id="shrineChoice${i}" onchange="runChecker()" style="font-size:.72rem;padding:.25rem .35rem;width:100%;border-color:var(--c-knife);color:var(--c-knife);font-weight:700">
-      <option value="">— Auto —</option>
-      ${[0,1,2].map(j=>{const k=shrine.opts[j];const t=AB[k];return k?`<option value="${k}"${chosenVal===k?' selected':''}>${t?t.name:k}</option>`:'';}).join('')}
-    </select>`;
+    const pick=`<div style="display:flex;align-items:center;gap:.3rem">
+      <span id="shrineLockIcon${i}" title="${chosenVal?'Locked — this ability is forced':'Unlocked — optimizer picks freely'}" style="font-size:.85rem;flex-shrink:0">${chosenVal?'🔒':'🔓'}</span>
+      <select id="shrineChoice${i}" onchange="updateShrineLock(${i})" style="font-size:.72rem;padding:.25rem .35rem;width:100%;border-color:var(--c-knife);color:var(--c-knife);font-weight:700">
+        <option value="">— Auto —</option>
+        ${[0,1,2].map(j=>{const k=shrine.opts[j];const t=AB[k];return k?`<option value="${k}"${chosenVal===k?' selected':''}>${t?t.name:k}</option>`:'';}).join('')}
+      </select>
+    </div>`;
     return`<div class="shrine-planner">
       <div style="font-size:.65rem;color:var(--c-knife);letter-spacing:.12em;font-weight:700;text-transform:uppercase;margin-bottom:.35rem">🎰 Vending Machine ${i+1}</div>
       ${opts}${pick}
@@ -471,11 +480,21 @@ function renderShrinePlanner(){
   }).join('')}</div>`;
   shrinePlan.forEach((shrine,i)=>{[0,1,2].forEach(j=>{const sel=document.getElementById('shrineOpt'+i+'_'+j);if(sel&&shrine.opts[j])sel.value=shrine.opts[j];});});
 }
+function updateShrineLock(i){
+  const sel=document.getElementById('shrineChoice'+i);
+  const icon=document.getElementById('shrineLockIcon'+i);
+  if(icon&&sel){
+    const locked=!!sel.value;
+    icon.textContent=locked?'🔒':'🔓';
+    icon.title=locked?'Locked — this ability is forced':'Unlocked — optimizer picks freely';
+  }
+  runChecker();
+}
 function updateShrineOpt(i,j,val){
   shrinePlan[i].opts[j]=val;
   const choiceSel=document.getElementById('shrineChoice'+i);
   if(choiceSel){const prev=choiceSel.value;const opts=shrinePlan[i].opts.filter(Boolean);choiceSel.innerHTML='<option value="">— Auto —</option>'+opts.map(k=>{const t=AB[k];return`<option value="${k}"${prev===k?' selected':''}>${t?t.name:k}</option>`;}).join('');}
-  runChecker();
+  updateShrineLock(i);
 }
 
 // ======== SIMULATION ========
@@ -665,6 +684,10 @@ function optimize(){
       for(const forceEmpty of configsToTry){
         const forcedSlots=forceEmpty?forceEmpty.split('+'):[];
         const slotItems=SLOTS.map(s=>{
+          if(checkerLocked[s.id]&&checkerGear[s.id]){
+            const locked=ITEM_DB[s.id].find(i=>i.name===checkerGear[s.id]);
+            if(locked)return[locked];
+          }
           if(forcedSlots.includes(s.id)){
             const empty=ITEM_DB[s.id].find(i=>i.abs.length===0);
             return empty?[empty]:[null];
@@ -683,13 +706,29 @@ function optimize(){
               const turns=simCombat(enemies,0,[...gAbs,...sAbs],dodgeFirst,rasPerKill,ignoreKills,oneShot,priority2RA,optGoal);
               const t1RA=(turns[0]||{}).ra||0;
               if(t1RA>=30){
+                // Canonicalize: if a slot's item isn't actually load-bearing for THIS
+                // ability combo (removing it still hits the threshold), treat it as
+                // free/"Any X" rather than a specific flavor item, so it merges with
+                // other builds that just happened to use a different unused item there.
+                const finalGear=cur.slice();
+                let workingAbs=gAbs;
+                SLOTS.forEach((s,si)=>{
+                  if(forcedSlots.includes(s.id))return; // already canonical empty
+                  if(checkerLocked[s.id]&&checkerGear[s.id])return; // user explicitly locked this
+                  const it=finalGear[si];
+                  if(!it)return;
+                  const candidateAbs=workingAbs.filter(a=>a.name!==it.name);
+                  const turns2=simCombat(enemies,0,[...candidateAbs,...sAbs],dodgeFirst,rasPerKill,ignoreKills,oneShot,priority2RA,optGoal);
+                  const ra2=(turns2[0]||{}).ra||0;
+                  if(ra2>=30){finalGear[si]=null;workingAbs=candidateAbs;}
+                });
                 // Signature for dedupe
-                const gearNames=cur.map(it=>it?it.name:'—').join('|');
+                const gearNames=finalGear.map(it=>it?it.name:'—').join('|');
                 const shrineSig=[...shrineKeys].sort().join('|');
                 const sig=gearNames+'||'+shrineSig+'||'+(forceEmpty||'');
                 if(!seen.has(sig)){
                   seen.add(sig);
-                  foundBuilds.push({gear:cur.slice(),shrineKeys:shrineKeys.slice(),t1RA,forcedEmpty:forceEmpty,turns});
+                  foundBuilds.push({gear:finalGear,shrineKeys:shrineKeys.slice(),t1RA,forcedEmpty:forceEmpty,turns});
                 }
               }
               return;
@@ -702,9 +741,9 @@ function optimize(){
     } // end pass loop
 
     // Categorize builds into tiers
-    const tierOver9000=[];    // ring+weapon both empty
-    const tierPoisonSafe=[];  // any of helm/neck/ring empty (but not both ring+weapon)
-    const tierPlain=[];       // no forced empty slot (or forced slot didn't provide poison safety)
+    let tierOver9000=[];    // ring+weapon both empty
+    let tierPoisonSafe=[];  // any of helm/neck/ring empty (but not both ring+weapon)
+    let tierPlain=[];       // no forced empty slot (or forced slot didn't provide poison safety)
 
     for(const b of foundBuilds){
       if(b.forcedEmpty==='ring+weapon') tierOver9000.push(b);
@@ -712,11 +751,50 @@ function optimize(){
       else tierPlain.push(b);
     }
 
-    // Sort each tier by RA descending, then group by weapon, keep top 3 per weapon
-    const sortDesc=(a,b)=>b.t1RA-a.t1RA;
+    // Sort each tier: fewest active vending abilities first (fewer animations = faster
+    // clears), then by RA descending as a tiebreaker.
+    const abilityCount=b=>b.shrineKeys.filter(Boolean).length;
+    const sortDesc=(a,b)=>abilityCount(a)-abilityCount(b)||b.t1RA-a.t1RA;
     tierOver9000.sort(sortDesc);
     tierPoisonSafe.sort(sortDesc);
     tierPlain.sort(sortDesc);
+
+    // Dedupe by gear combination: the same item set reached via different vending
+    // ability picks is the same build to the player, so keep only the best-ranked
+    // (leanest/highest-RA, since arrays are already sorted) instance per item set.
+    const gearSig=b=>b.gear.map(it=>it?it.name:'—').join('|');
+    function dedupeByGear(arr){
+      const seenGear=new Set();
+      return arr.filter(b=>{
+        const sig=gearSig(b);
+        if(seenGear.has(sig))return false;
+        seenGear.add(sig);
+        return true;
+      });
+    }
+    tierOver9000=dedupeByGear(tierOver9000);
+    tierPoisonSafe=dedupeByGear(tierPoisonSafe);
+    tierPlain=dedupeByGear(tierPlain);
+
+    // Drop builds that are strictly more specific than another build already in the
+    // list — e.g. if one build shows "Any Weapon" with everything else identical,
+    // a variant naming one particular weapon adds nothing and gets removed.
+    const slotVal=it=>(!it||it.abs.length===0)?null:it.name;
+    function subsumes(a,b){ // does a (more general) make b redundant?
+      let moreGeneral=false;
+      for(let i=0;i<a.gear.length;i++){
+        const ai=slotVal(a.gear[i]),bi=slotVal(b.gear[i]);
+        if(ai===null){ if(bi!==null)moreGeneral=true; }
+        else if(ai!==bi) return false;
+      }
+      return moreGeneral;
+    }
+    function removeSubsumed(arr){
+      return arr.filter(b=>!arr.some(a=>a!==b&&subsumes(a,b)));
+    }
+    tierOver9000=removeSubsumed(tierOver9000);
+    tierPoisonSafe=removeSubsumed(tierPoisonSafe);
+    tierPlain=removeSubsumed(tierPlain);
 
     // Group by weapon slot (index 3 in SLOTS), keep top 3 per weapon
     function groupByWeapon(builds){
@@ -811,16 +889,46 @@ function optimize(){
         poisonNote=`<span style="font-size:.7rem;color:var(--text-dim);font-weight:700">No slot free for poison cleanse</span>`;
       }
 
-      // Row renderer for a single item (stacked layout)
-      function itemRow(item, slot){
-        const isEmpty=!item||item.abs.length===0;
-        const name=isEmpty?`Any ${slot.name}`:item.name;
+      // Row renderer for a single item slot — item can be a single item, null (any),
+      // or an array of interchangeable alternative items for that slot.
+      function itemRow(itemOrList, slot){
+        const list=Array.isArray(itemOrList)?itemOrList:[itemOrList];
+        const isEmpty=list.every(item=>!item||item.abs.length===0);
+        const name=isEmpty?`Any ${slot.name}`:list.filter(item=>item&&item.abs.length>0).map(item=>item.name).join(' / ');
         return`<div style="display:flex;align-items:center;gap:.35rem;padding:.25rem .5rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:5px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'};font-size:.75rem;white-space:nowrap"><span style="font-size:.9em">${slot.icon}</span>${name}</div>`;
       }
 
-      // Each build gets its own box with all slots stacked vertically
-      const buildBoxes=builds.map(b=>{
-        const rows=SLOTS.map((slot,i)=>itemRow(b.gear[i],slot)).join('');
+      // Merge builds that are identical in every slot except one, into a single
+      // card listing the interchangeable alternatives for that slot (e.g. "Seething
+      // Sash / Volatile Sash") instead of repeating an otherwise-identical build.
+      const slotVal=it=>(!it||it.abs.length===0)?null:it.name;
+      function clusterBuilds(list){
+        const remaining=list.slice();
+        const clusters=[];
+        while(remaining.length){
+          const first=remaining.shift();
+          const slots=first.gear.map(it=>[it]); // per-slot list of alternatives
+          const toRemove=[];
+          for(let i=0;i<remaining.length;i++){
+            const other=remaining[i];
+            let diffSlot=-1,diffCount=0;
+            for(let s=0;s<6;s++){
+              if(slotVal(slots[s][0])!==slotVal(other.gear[s])){diffCount++;diffSlot=s;}
+            }
+            if(diffCount===1){
+              if(!slots[diffSlot].some(it=>slotVal(it)===slotVal(other.gear[diffSlot])))slots[diffSlot].push(other.gear[diffSlot]);
+              toRemove.push(i);
+            }
+          }
+          for(let i=toRemove.length-1;i>=0;i--)remaining.splice(toRemove[i],1);
+          clusters.push(slots);
+        }
+        return clusters;
+      }
+
+      // Each merged build cluster gets its own box with all slots stacked vertically
+      const buildBoxes=clusterBuilds(builds).map(slots=>{
+        const rows=SLOTS.map((slot,i)=>itemRow(slots[i],slot)).join('');
         return`<div style="min-width:180px;padding:.4rem .55rem;background:#f8f2df;border:1.5px dashed #d0c0a0;border-radius:6px;display:flex;flex-direction:column;gap:.25rem">
           ${rows}
         </div>`;
