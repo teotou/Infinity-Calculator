@@ -647,15 +647,22 @@ function optimize(){
   const itemHasOnHit=it=>getItemAbs(it).some(a=>{const t=AB[a.k];return t&&t.trigger==='hit'&&t.effect!=='lightning';});
   const shrineAbs=k=>{const t=AB[k];if(!t)return null;return{name:t.name+' (vending)',trigger:t.trigger,effect:t.effect,rageAmt:t.defR,hitN:t.hitN,turnN:t.turnN,every:t.every,onlyTurn:t.onlyTurn,effCount:t.effCount,noImpact:t.noImpact};};
 
-  // Show searching...
-  listDiv.innerHTML='<div class="empty" style="padding:1.5rem;text-align:center;color:var(--text-dim)">Searching…</div>';
+  // Show searching... with a live progress bar
+  listDiv.innerHTML=`<div class="empty" style="padding:1.2rem 1.5rem;text-align:center;color:var(--text-dim)">
+    <div id="searchLabel" style="margin-bottom:.5rem;font-weight:700">Searching…</div>
+    <div style="height:14px;background:#e6dcc0;border:1.5px solid var(--border);border-radius:999px;overflow:hidden">
+      <div id="searchBar" style="height:100%;width:0%;background:linear-gradient(90deg,var(--accent),#f0b429);transition:width .12s linear"></div>
+    </div>
+    <div id="searchSub" style="margin-top:.4rem;font-size:.72rem;opacity:.8">Preparing…</div>
+  </div>`;
 
   setTimeout(()=>{
     // Collect infinite builds across all forced-empty configurations
     const foundBuilds=[]; // {gear, shrineKeys, t1RA, forcedEmpty}
+    const bestByWeapon=new Map(); // weapon name (or __any__) -> best build for it
     const seen=new Set(); // dedupe by gear+shrine signature
     const searchStart=performance.now();
-    const SEARCH_BUDGET_MS=3000;
+    const SEARCH_BUDGET_MS=12000;
     EQUIV_ITEMS.clear(); // slotId|repName -> [interchangeable item names]
 
     const passesToRun=wantDodgeSafe?[true, false]:[false];
@@ -663,7 +670,11 @@ function optimize(){
       // If dodge-safe first pass found builds, don't run fallback
       if(!avoidNoHit && foundBuilds.length>0) break;
 
-      // Build shrine combos respecting user's manual picks
+      // Build shrine combos respecting user's manual picks.
+      // Only magic-knife abilities can stack across machines — every other ability
+      // can appear at most once (you can't run two "H on L", but you can run five
+      // "mK on atk"), so duplicates of non-knife abilities are pruned here.
+      const canRepeat=k=>{const t=AB[k];return!!t&&t.effect==='magic_knife';};
       const shrineCombos=[];
       function buildShrineCombos(idx,current){
         if(idx>=shrinePlan.length){shrineCombos.push(current.slice());return;}
@@ -673,6 +684,7 @@ function optimize(){
         else{
           let opts=shrine.opts.filter(Boolean);
           if(avoidNoHit)opts=opts.filter(k=>!isRiskyOnHit(k));
+          opts=opts.filter(k=>canRepeat(k)||!current.includes(k));
           if(opts.length===0){current.push(null);buildShrineCombos(idx+1,current);current.pop();}
           else{
             opts.forEach(k=>{current.push(k);buildShrineCombos(idx+1,current);current.pop();});
@@ -742,17 +754,28 @@ function optimize(){
       };
 
       let lastCount=-1;
-      for(const shrineKeys of shrineCombos){
+      let poisonFoundAt=-1;
+      let comboIdx=0;
+      let stopped=false;
+      function processCombo(shrineKeys){
         // Combos are ordered by ability count (fewest first, since fewer abilities
-        // means fewer animations in-game). Stop going deeper once we already have
-        // the best possible tier, or once the search budget is spent — but never
-        // stop so early that a better tier further down would be hidden.
+        // means fewer animations in-game). Keep searching deeper levels until we
+        // find the best tier — a leaner combo often only reaches plain Infinite
+        // while one extra ability unlocks Poison Cleanse or Over 9000, so stopping
+        // at the first level that yields ANY build would hide the better options.
         const thisCount=shrineKeys.filter(Boolean).length;
         if(thisCount!==lastCount){
-          if(foundBuilds.length>0){
-            if(foundBuilds.some(b=>b.forcedEmpty==='ring+weapon'))break; // Over 9000 found
-            if(performance.now()-searchStart>SEARCH_BUDGET_MS)break;
-          }
+          // Stop when every weapon (plus the weapon-free slot) has hit the best
+          // tier it can reach — nothing deeper can improve on that.
+          const weaponPool=slotItems[3]||[];
+          const saturated=weaponPool.every(it=>{
+            const k=it?it.name:'__any__';
+            const b=bestByWeapon.get(k);
+            const cap=(it&&it.abs.length>0)?2:3;
+            return b&&b.rank>=cap;
+          })&&bestByWeapon.has('__any__')&&bestByWeapon.get('__any__').rank===3;
+          if(saturated)return false;
+          if(performance.now()-searchStart>SEARCH_BUDGET_MS)return false;     // out of time
           lastCount=thisCount;
         }
         const sAbs=shrineKeys.filter(Boolean).map(shrineAbs).filter(Boolean);
@@ -799,18 +822,31 @@ function optimize(){
                 const candidateAbs=workingAbs.filter(a=>a.name!==it.name);
                 if(raOf(candidateAbs).ra>=30){finalGear[si]=null;workingAbs=candidateAbs;}
               });
-              // Signature for dedupe
-              const gearNames=finalGear.map(it=>it?it.name:'—').join('|');
-              const shrineSig=[...shrineKeys].sort().join('|');
-              const sig=gearNames+'||'+shrineSig+'||'+(forceEmpty||'');
-              if(!seen.has(sig)){
-                seen.add(sig);
-                foundBuilds.push({gear:finalGear,shrineKeys:shrineKeys.slice(),t1RA,forcedEmpty:forceEmpty,turns});
+              // Rank: Over 9000 (3) > poison cleanse (2) > plain (1).
+              const rank=forceEmpty==='ring+weapon'?3:(forceEmpty?2:1);
+              const wKey=finalGear[WEAPON]?finalGear[WEAPON].name:'__any__';
+              const abilityCount=shrineKeys.filter(Boolean).length;
+              const prev=bestByWeapon.get(wKey);
+              const better=!prev||rank>prev.rank||
+                (rank===prev.rank&&abilityCount<prev.abilityCount)||
+                (rank===prev.rank&&abilityCount===prev.abilityCount&&t1RA>prev.t1RA);
+              if(better){
+                bestByWeapon.set(wKey,{gear:finalGear,shrineKeys:shrineKeys.slice(),t1RA,forcedEmpty:forceEmpty,turns,rank,abilityCount});
               }
             }
             return;
           }
           for(const it of slotItems[idx]){
+            // Prune: a weapon that already has its best achievable tier can't be
+            // improved by a combo using MORE abilities (combos run fewest-first),
+            // so skip that whole branch. A specific weapon tops out at poison
+            // cleanse; only the weapon-free branch can reach Over 9000.
+            if(idx===3){
+              const k=it?it.name:'__any__';
+              const b=bestByWeapon.get(k);
+              const cap=(it&&it.abs.length>0)?2:3;
+              if(b&&b.rank>=cap&&b.abilityCount<shrineKeys.filter(Boolean).length)continue;
+            }
             cur.push(it);
             const add=absFor(it);
             combine(idx+1,cur,add.length?accAbs.concat(add):accAbs);
@@ -818,227 +854,64 @@ function optimize(){
           }
         }
         combine(0,[],[]);
+        return true;
       }
+
+      // Run the combos in time-sliced chunks so the browser can repaint the
+      // progress bar between batches instead of freezing for the whole search.
+      const bar=document.getElementById('searchBar');
+      const sub=document.getElementById('searchSub');
+      const total=shrineCombos.length;
+      function runChunk(){
+        const sliceStart=performance.now();
+        while(comboIdx<total){
+          if(!processCombo(shrineCombos[comboIdx])){stopped=true;break;}
+          comboIdx++;
+          if(performance.now()-sliceStart>60)break; // yield to let the UI paint
+        }
+        const pct=stopped?100:Math.round(comboIdx/total*100);
+        if(bar)bar.style.width=pct+'%';
+        if(sub){
+          const secs=((performance.now()-searchStart)/1000).toFixed(1);
+          sub.textContent=`${Math.min(comboIdx,total)} / ${total} ability combos · ${bestByWeapon.size} weapons covered · ${secs}s`;
+        }
+        if(!stopped&&comboIdx<total){requestAnimationFrame(runChunk);return;}
+        finish();
+      }
+      runChunk();
+      return; // finish() continues once the chunked search completes
     } // end pass loop
 
-    // Categorize builds into tiers
-    let tierOver9000=[];    // ring+weapon both empty
-    let tierPoisonSafe=[];  // any of helm/neck/ring empty (but not both ring+weapon)
-    let tierPlain=[];       // no forced empty slot (or forced slot didn't provide poison safety)
-
-    for(const b of foundBuilds){
-      if(b.forcedEmpty==='ring+weapon') tierOver9000.push(b);
-      else if(b.forcedEmpty && ['helm','neck','ring'].includes(b.forcedEmpty)) tierPoisonSafe.push(b);
-      else tierPlain.push(b);
+    function finish(){
+    function icoFor(effect){
+      const m={rage:'ico-rage',lightning:'ico-lightning',magic_knife:'ico-knife',heal:'ico-heal',shield:'ico-shield'};
+      const l={rage:'R',lightning:'L',magic_knife:'MK',heal:'+',shield:'S'};
+      return`<span class="ico ${m[effect]||''}">${l[effect]||'?'}</span>`;
     }
-
-    // Drop builds whose vending abilities are a strict superset of another build's
-    // in the same tier: the extra abilities buy nothing but extra animations.
-    function dropSupersetAbilities(arr){
-      const counts=arr.map(b=>{
-        const m=new Map();
-        b.shrineKeys.filter(Boolean).forEach(k=>m.set(k,(m.get(k)||0)+1));
-        return{m,total:b.shrineKeys.filter(Boolean).length};
-      });
-      const isSubset=(a,b)=>{ // is a's multiset contained in b's?
-        for(const[k,v]of a.m){if((b.m.get(k)||0)<v)return false;}
-        return true;
-      };
-      return arr.filter((b,i)=>!counts.some((c,j)=>j!==i&&c.total<counts[i].total&&isSubset(c,counts[i])));
-    }
-    tierOver9000=dropSupersetAbilities(tierOver9000);
-    tierPoisonSafe=dropSupersetAbilities(tierPoisonSafe);
-    tierPlain=dropSupersetAbilities(tierPlain);
-
-    // Sort each tier: fewest active vending abilities first (fewer animations = faster
-    // clears), then by RA descending as a tiebreaker.
-    const abilityCount=b=>b.shrineKeys.filter(Boolean).length;
-    const sortDesc=(a,b)=>abilityCount(a)-abilityCount(b)||b.t1RA-a.t1RA;
-    tierOver9000.sort(sortDesc);
-    tierPoisonSafe.sort(sortDesc);
-    tierPlain.sort(sortDesc);
-
-    // Dedupe by gear combination: the same item set reached via different vending
-    // ability picks is the same build to the player, so keep only the best-ranked
-    // (leanest/highest-RA, since arrays are already sorted) instance per item set.
-    const gearSig=b=>b.gear.map(it=>it?it.name:'—').join('|');
-    function dedupeByGear(arr){
-      const seenGear=new Set();
-      return arr.filter(b=>{
-        const sig=gearSig(b);
-        if(seenGear.has(sig))return false;
-        seenGear.add(sig);
-        return true;
-      });
-    }
-    tierOver9000=dedupeByGear(tierOver9000);
-    tierPoisonSafe=dedupeByGear(tierPoisonSafe);
-    tierPlain=dedupeByGear(tierPlain);
-
-    // Drop builds that are strictly more specific than another build already in the
-    // list — e.g. if one build shows "Any Weapon" with everything else identical,
-    // a variant naming one particular weapon adds nothing and gets removed.
-    const slotVal=it=>(!it||it.abs.length===0)?null:it.name;
-    function subsumes(a,b){ // does a (more general) make b redundant?
-      let moreGeneral=false;
-      for(let i=0;i<a.gear.length;i++){
-        const ai=slotVal(a.gear[i]),bi=slotVal(b.gear[i]);
-        if(ai===null){ if(bi!==null)moreGeneral=true; }
-        else if(ai!==bi) return false;
-      }
-      return moreGeneral;
-    }
-    function removeSubsumed(arr){
-      return arr.filter(b=>!arr.some(a=>a!==b&&subsumes(a,b)));
-    }
-    tierOver9000=removeSubsumed(tierOver9000);
-    tierPoisonSafe=removeSubsumed(tierPoisonSafe);
-    tierPlain=removeSubsumed(tierPlain);
-
-    // Group by weapon slot (index 3 in SLOTS), keep top 3 per weapon
-    function groupByWeapon(builds){
-      const groups={};
-      const order=[];
-      for(const b of builds){
-        const w=b.gear[3];
-        const key=w?w.name:'— No Weapon —';
-        if(!groups[key]){groups[key]=[]; order.push(key);}
-        if(groups[key].length<3)groups[key].push(b);
-      }
-      // Flatten in order
-      const out=[];
-      for(const k of order){out.push(...groups[k]);}
-      return out;
-    }
-
-    const top9000=groupByWeapon(tierOver9000);
-    // Poison: split by slot first, then group each slot by weapon (top 3)
-    const topPoisonBySlot={helm:[],neck:[],ring:[]};
-    for(const slotKey of ['helm','neck','ring']){
-      const bySlot=tierPoisonSafe.filter(b=>b.forcedEmpty===slotKey);
-      topPoisonBySlot[slotKey]=groupByWeapon(bySlot);
-    }
-    const anyPoisonBuilds=Object.values(topPoisonBySlot).some(a=>a.length>0);
-    // Only show plain infinite if no better tier has any builds
-    const topPlain=(top9000.length>0||anyPoisonBuilds)?[]:groupByWeapon(tierPlain);
-
-    // Render
-    if(top9000.length===0 && !anyPoisonBuilds && topPlain.length===0){
-      listDiv.innerHTML='<div class="empty" style="padding:1.5rem;text-align:center;color:var(--text-dim);font-style:italic">No infinite builds possible with current vending machines. Try adding more options or different abilities.</div>';
-      return;
-    }
-
-    const slotIcons={helm:'🪖',chest:'🛡',neck:'🔱',weapon:'⚔',ring:'💍',belt:'👑'};
-    function renderBuild(build, tier){
-      const borderColor=tier==='over9000'?'#e84030':tier==='poison'?'#3ec070':'#999';
-      const tierLabel=tier==='over9000'?'⚡ Over 9000':tier==='poison'?'✓ Poison Cleanse':'∞ Infinite';
-      const tierColor=tier==='over9000'?'#e84030':tier==='poison'?'#2fb050':'#666';
-
-      // Compact gear list
-      const gearParts=build.gear.map((it,i)=>{
-        const slot=SLOTS[i];
-        const isEmpty=!it||it.abs.length===0;
-        const name=isEmpty?`Any ${slot.name}`:it.name;
-        return`<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.72rem;padding:.15rem .35rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:4px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'}"><span style="font-size:.85em">${slot.icon}</span>${name}</span>`;
-      }).join(' ');
-
-      // Vending abilities used
-      const vendPills=build.shrineKeys.filter(Boolean).map(k=>{
-        const t=AB[k];if(!t)return'';
-        return`<span class="ability-tag" style="font-size:.65rem;padding:2px 7px 2px 3px">${icoFor(t.effect)}<span>${t.name}</span></span>`;
-      }).join(' ');
-
-      // Poison note (which slot is free)
-      let poisonNote='';
-      if(build.forcedEmpty){
-        const slotLabel={helm:'Helm',neck:'Neck',ring:'Ring','ring+weapon':'Ring + Weapon'};
-        poisonNote=`<span style="font-size:.7rem;color:${tierColor};font-weight:700;margin-left:.4rem">🧪 ${slotLabel[build.forcedEmpty]} free</span>`;
-      }
-
-      return`<div style="border:2px solid ${borderColor};border-radius:10px;padding:.55rem .7rem;margin-bottom:.5rem;background:#fdfaf3">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:.5rem;margin-bottom:.4rem;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap">
-            <span style="font-size:.72rem;font-weight:700;color:${tierColor};letter-spacing:.03em">${tierLabel}</span>
-            ${poisonNote}
-          </div>
-          <span style="font-size:.85rem;font-weight:700;color:${tierColor}">${build.t1RA} RAs</span>
-        </div>
-        <div style="display:flex;flex-wrap:wrap;gap:.25rem;margin-bottom:.35rem">${gearParts}</div>
-        ${vendPills?`<div style="display:flex;flex-wrap:wrap;gap:.2rem">${vendPills}</div>`:''}
-      </div>`;
-    }
-
-    // Helper: render a group of builds sharing the same vending picks
     function renderVendingGroup(builds, tier, tierLabelText){
       if(builds.length===0)return '';
       const borderColor=tier==='over9000'?'#e84030':tier==='poison'?'#3ec070':'#999';
       const tierColor=tier==='over9000'?'#e84030':tier==='poison'?'#2fb050':'#666';
-      const tierLabel=tier==='over9000'?'⚡ OVER 9000':tier==='poison'?'✓ INFINITE + POISON CLEANSE':'∞ INFINITE';
-      const headerLabel=`<div style="font-size:.66rem;font-weight:700;color:${tierColor};letter-spacing:.06em;margin-bottom:.3rem">${tierLabelText||tierLabel}</div>`;
+      const headerLabel=`<div style="font-size:.66rem;font-weight:700;color:${tierColor};letter-spacing:.06em;margin-bottom:.3rem">${tierLabelText||''}</div>`;
 
-      // Vending pills
       const vendPills=builds[0].shrineKeys.filter(Boolean).map(k=>{
         const t=AB[k];if(!t)return'';
         return`<span class="ability-tag" style="font-size:.65rem;padding:2px 7px 2px 3px">${icoFor(t.effect)}<span>${t.name}</span></span>`;
       }).join(' ');
 
-      // Poison cleanse note — only show the "no slot free" case; the free-slot
-      // case is already conveyed by the section header (e.g. "— HELM")
-      let poisonNote='';
-      if(!builds[0].forcedEmpty&&tier==='plain'){
-        poisonNote=`<span style="font-size:.7rem;color:var(--text-dim);font-weight:700">No slot free for poison cleanse</span>`;
-      }
-
-      // Row renderer for a single item slot — item can be a single item, null (any),
-      // or an array of interchangeable alternative items for that slot.
-      function itemRow(itemOrList, slot){
-        const list=Array.isArray(itemOrList)?itemOrList:[itemOrList];
-        const isEmpty=list.every(item=>!item||item.abs.length===0);
+      function itemRow(item, slot){
+        const isEmpty=!item||item.abs.length===0;
         const names=[];
-        list.filter(item=>item&&item.abs.length>0).forEach(item=>{
+        if(!isEmpty){
           const equiv=EQUIV_ITEMS.get(slot.id+'|'+item.name);
           (equiv||[item.name]).forEach(n=>{if(!names.includes(n))names.push(n);});
-        });
+        }
         const name=isEmpty?`Any ${slot.name}`:names.join(' / ');
         return`<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem .4rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:4px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'};font-size:.72rem;min-width:0" title="${name}"><span style="font-size:.9em;flex-shrink:0">${slot.icon}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span></div>`;
       }
 
-      // Merge builds that are identical in every slot except one, into a single
-      // card listing the interchangeable alternatives for that slot (e.g. "Seething
-      // Sash / Volatile Sash") instead of repeating an otherwise-identical build.
-      // Only ONE slot per card may vary: if alternatives were collected in two
-      // different slots, the card would imply every cross-combination of them, and
-      // those combinations were never actually validated by the search.
-      const slotVal=it=>(!it||it.abs.length===0)?null:it.name;
-      function clusterBuilds(list){
-        const remaining=list.slice();
-        const clusters=[];
-        while(remaining.length){
-          const first=remaining.shift();
-          const slots=first.gear.map(it=>[it]); // per-slot list of alternatives
-          let varySlot=-1; // the single slot this card is allowed to vary in
-          const toRemove=[];
-          for(let i=0;i<remaining.length;i++){
-            const other=remaining[i];
-            let diffSlot=-1,diffCount=0;
-            for(let s=0;s<6;s++){
-              if(slotVal(slots[s][0])!==slotVal(other.gear[s])){diffCount++;diffSlot=s;}
-            }
-            if(diffCount!==1)continue;
-            if(varySlot!==-1&&diffSlot!==varySlot)continue; // would imply an unverified cross-product
-            varySlot=diffSlot;
-            if(!slots[diffSlot].some(it=>slotVal(it)===slotVal(other.gear[diffSlot])))slots[diffSlot].push(other.gear[diffSlot]);
-            toRemove.push(i);
-          }
-          for(let i=toRemove.length-1;i>=0;i--)remaining.splice(toRemove[i],1);
-          clusters.push(slots);
-        }
-        return clusters;
-      }
-
-      // Each merged build cluster gets its own box with all slots stacked vertically
-      const buildBoxes=clusterBuilds(builds).map(slots=>{
-        const rows=SLOTS.map((slot,i)=>itemRow(slots[i],slot)).join('');
+      const buildBoxes=builds.map(b=>{
+        const rows=SLOTS.map((slot,i)=>itemRow(b.gear[i],slot)).join('');
         return`<div style="flex:1 1 175px;min-width:165px;padding:.3rem .35rem;background:#f8f2df;border:1.5px dashed #d0c0a0;border-radius:6px;display:flex;flex-direction:column;gap:.18rem">
           ${rows}
         </div>`;
@@ -1048,7 +921,6 @@ function optimize(){
         ${headerLabel}
         <div style="display:flex;flex-wrap:wrap;gap:.25rem;align-items:center;margin-bottom:.35rem;padding-bottom:.3rem;border-bottom:1px dashed #d0c0a0">
           ${vendPills}
-          ${poisonNote}
         </div>
         <div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:.35rem;align-items:stretch">
           ${buildBoxes}
@@ -1056,50 +928,30 @@ function optimize(){
       </div>`;
     }
 
-    // Render just gear (vending shown at group header)
-    function renderBuildGearOnly(build, tier){
-      const borderColor=tier==='over9000'?'#e84030':tier==='poison'?'#3ec070':'#999';
-      const tierColor=tier==='over9000'?'#e84030':tier==='poison'?'#2fb050':'#666';
-      const gearParts=build.gear.map((it,i)=>{
-        const slot=SLOTS[i];
-        const isEmpty=!it||it.abs.length===0;
-        const name=isEmpty?`Any ${slot.name}`:it.name;
-        return`<span style="display:inline-flex;align-items:center;gap:.2rem;font-size:.72rem;padding:.15rem .35rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:4px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'}"><span style="font-size:.85em">${slot.icon}</span>${name}</span>`;
-      }).join(' ');
-      return`<div style="border:2px solid ${borderColor};border-radius:8px;padding:.4rem .55rem;margin-bottom:.35rem;background:#fdfaf3;display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap">
-        <div style="display:flex;flex-wrap:wrap;gap:.25rem;flex:1">${gearParts}</div>
-        <span style="font-size:.8rem;font-weight:700;color:${tierColor};white-space:nowrap">${build.t1RA} RAs</span>
-      </div>`;
+    // One entry per weapon, best build first. Over 9000 (weapon slot free) ranks
+    // above poison cleanse, which ranks above plain infinite; ties break toward
+    // fewer vending abilities (fewer animations), then higher RA.
+    const entries=[...bestByWeapon.entries()].map(([k,b])=>({key:k,b}));
+    entries.sort((x,y)=>y.b.rank-x.b.rank||x.b.abilityCount-y.b.abilityCount||y.b.t1RA-x.b.t1RA);
+
+    if(entries.length===0){
+      listDiv.innerHTML='<div class="empty" style="padding:1.5rem;text-align:center;color:var(--text-dim)">No infinite builds possible with current vending machines. Try adding more options or different abilities.</div>';
+      return;
     }
 
-    // Given a list of builds, group by unique vending picks (shrineKeys sorted)
-    function collectGroups(builds, tier, label){
-      const groups=new Map();
-      for(const b of builds){
-        const key=[...b.shrineKeys].filter(Boolean).sort().join('|');
-        if(!groups.has(key))groups.set(key,[]);
-        groups.get(key).push(b);
-      }
-      return[...groups.values()].map(gb=>renderVendingGroup(gb,tier,label));
-    }
-
-    // All groups from every tier flow into one grid, so columns stay filled instead
-    // of each tier reserving its own full-width row.
-    const cells=[];
-    if(top9000.length>0)cells.push(...collectGroups(top9000,'over9000','⚡ OVER 9000'));
-    if(anyPoisonBuilds){
-      const slotOrder=['helm','neck','ring'];
-      const slotLabels={helm:'HELM',neck:'NECK',ring:'RING'};
-      for(const slotKey of slotOrder){
-        const bySlot=topPoisonBySlot[slotKey];
-        if(bySlot.length===0)continue;
-        cells.push(...collectGroups(bySlot,'poison',`✓ POISON CLEANSE — ${slotLabels[slotKey]}`));
-      }
-    }
-    if(topPlain.length>0)cells.push(...collectGroups(topPlain,'plain','∞ INFINITE'));
+    const cells=entries.map(({key,b})=>{
+      const tier=b.rank===3?'over9000':(b.rank===2?'poison':'plain');
+      const slotLabel={helm:'Helm',neck:'Neck',ring:'Ring'};
+      const label=b.rank===3?'\u26a1 OVER 9000 \u2014 NO WEAPON NEEDED'
+        :(b.rank===2?`\u2713 POISON CLEANSE \u2014 ${(slotLabel[b.forcedEmpty]||'').toUpperCase()}`
+        :'\u221e INFINITE');
+      const weaponName=key==='__any__'?'Any Weapon':key;
+      return renderVendingGroup([b],tier,`${weaponName} \u00b7 ${label}`);
+    });
 
     layoutMasonry(listDiv, cells);
-  },30); // setTimeout so "Searching…" renders first
+    } // end finish()
+  },30); // setTimeout so the progress bar renders first
 }
 
 
