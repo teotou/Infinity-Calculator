@@ -38,7 +38,8 @@
   input,select{background:#fff;border:1.5px solid var(--border);border-radius:8px;color:var(--text);font-family:'Pixelify Sans',monospace;font-size:.88rem;padding:.45rem .65rem;outline:none;width:100%;font-weight:700;transition:border-color .15s}
   input:focus,select:focus{border-color:var(--panel-dark)}
   select option{background:#fff;color:var(--text);font-weight:700}
-  select option:disabled{color:var(--accent-dark);font-weight:700;background:#f5e9c5;letter-spacing:.06em}
+  select option:disabled.grp{color:var(--accent-dark);font-weight:700;background:#f5e9c5;letter-spacing:.06em}
+  select option:disabled.inuse{color:#a8a29a;font-weight:500;background:#f0ece2;font-style:italic}
   .fl{font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--text-dim);margin-bottom:.2rem;font-weight:700}
 
   /* Buttons */
@@ -446,7 +447,7 @@ function equipItem(sid,name){/* removed */}
 function toggleLock(sid,val){/* removed */}
 
 function renderShrinePlanner(){
-  const count=8;
+  const count=9;
   while(shrinePlan.length<count)shrinePlan.push({opts:['','','']});
   while(shrinePlan.length>count)shrinePlan.pop();
   const div=document.getElementById('shrinePlanner');
@@ -460,13 +461,28 @@ function renderShrinePlanner(){
     {label:'🛡 Shield',keys:['shield_on_kill','shield_on_hit_5','shield_on_rage','shield_if_low']},
     {label:'⚙ Other',keys:['life_steal']},
   ];
-  const abOpts=groups.map(g=>{
-    const opts=g.keys.filter(k=>!excluded.has(k)&&AB[k]).map(k=>`<option value="${k}">　 ${AB[k].name}</option>`).join('');
-    return opts?`<option disabled>━━━ ${g.label} ━━━</option>${opts}`:'';
-  }).join('');
+  // A non-knife ability appears at most ONCE per dungeon across all machines, so
+  // any already picked elsewhere is greyed out. Knife abilities can repeat freely.
+  const canRepeatOpt=k=>{const t=AB[k];return!!t&&t.effect==='magic_knife';};
+  function abOptsFor(mi,mj){
+    const used=new Set();
+    shrinePlan.forEach((sh,ii)=>(sh.opts||[]).forEach((k,jj)=>{
+      if(!k||canRepeatOpt(k))return;
+      if(ii===mi&&jj===mj)return; // don't block this dropdown's own value
+      used.add(k);
+    }));
+    return groups.map(g=>{
+      const opts=g.keys.filter(k=>!excluded.has(k)&&AB[k]).map(k=>{
+        const dis=used.has(k)?' disabled class="inuse"':'';
+        const mark=used.has(k)?' — in use':'';
+        return`<option value="${k}"${dis}>　 ${AB[k].name}${mark}</option>`;
+      }).join('');
+      return opts?`<option disabled class="grp">━━━ ${g.label} ━━━</option>${opts}`:'';
+    }).join('');
+  }
   div.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:.4rem">${shrinePlan.map((shrine,i)=>{
     const chosen=document.getElementById('shrineChoice'+i);const chosenVal=chosen?chosen.value:'';
-    const opts=[0,1,2].map(j=>`<select id="shrineOpt${i}_${j}" onchange="updateShrineOpt(${i},${j},this.value)" style="font-size:.72rem;padding:.25rem .35rem;margin-bottom:.2rem;width:100%"><option value="">— option —</option>${abOpts}</select>`).join('');
+    const opts=[0,1,2].map(j=>`<select id="shrineOpt${i}_${j}" onchange="updateShrineOpt(${i},${j},this.value)" style="font-size:.72rem;padding:.25rem .35rem;margin-bottom:.2rem;width:100%"><option value="">— option —</option>${abOptsFor(i,j)}</select>`).join('');
     const pick=`<div style="display:flex;align-items:center;gap:.3rem">
       <span id="shrineLockIcon${i}" title="${chosenVal?'Locked — this ability is forced':'Unlocked — optimizer picks freely'}" style="font-size:.85rem;flex-shrink:0">${chosenVal?'🔒':'🔓'}</span>
       <select id="shrineChoice${i}" onchange="updateShrineLock(${i})" style="font-size:.72rem;padding:.25rem .35rem;width:100%;border-color:var(--c-knife);color:var(--c-knife);font-weight:700">
@@ -493,8 +509,9 @@ function updateShrineLock(i){
 }
 function updateShrineOpt(i,j,val){
   shrinePlan[i].opts[j]=val;
-  const choiceSel=document.getElementById('shrineChoice'+i);
-  if(choiceSel){const prev=choiceSel.value;const opts=shrinePlan[i].opts.filter(Boolean);choiceSel.innerHTML='<option value="">— Auto —</option>'+opts.map(k=>{const t=AB[k];return`<option value="${k}"${prev===k?' selected':''}>${t?t.name:k}</option>`;}).join('');}
+  // Re-render so the newly used ability is greyed out in every other machine
+  // (and a cleared one becomes available again).
+  renderShrinePlanner();
   updateShrineLock(i);
 }
 
@@ -660,6 +677,7 @@ function optimize(){
     // Collect infinite builds across all forced-empty configurations
     const foundBuilds=[]; // {gear, shrineKeys, t1RA, forcedEmpty}
     const bestByWeapon=new Map(); // weapon name (or __any__) -> best build for it
+    const over9000All=[]; const o9seen=new Set(); // every distinct Over 9000 gear combo
     const seen=new Set(); // dedupe by gear+shrine signature
     const searchStart=performance.now();
     const SEARCH_BUDGET_MS=12000;
@@ -824,6 +842,16 @@ function optimize(){
               });
               // Rank: Over 9000 (3) > poison cleanse (2) > plain (1).
               const rank=forceEmpty==='ring+weapon'?3:(forceEmpty?2:1);
+              // Over 9000 frees the weapon and ring, so the remaining slots often
+              // have several valid fillers (e.g. Seething Sash OR Stormwrath Belt).
+              // Keep every distinct one so the player can see all their options.
+              if(rank===3){
+                const sig=finalGear.map(it=>it?it.name:'—').join('|')+'||'+[...shrineKeys].filter(Boolean).sort().join('|');
+                if(!o9seen.has(sig)&&over9000All.length<400){
+                  o9seen.add(sig);
+                  over9000All.push({gear:finalGear.slice(),shrineKeys:shrineKeys.slice(),t1RA,forcedEmpty:forceEmpty,turns,rank,abilityCount:shrineKeys.filter(Boolean).length});
+                }
+              }
               const wKey=finalGear[WEAPON]?finalGear[WEAPON].name:'__any__';
               const abilityCount=shrineKeys.filter(Boolean).length;
               const prev=bestByWeapon.get(wKey);
@@ -899,19 +927,47 @@ function optimize(){
         return`<span class="ability-tag" style="font-size:.65rem;padding:2px 7px 2px 3px">${icoFor(t.effect)}<span>${t.name}</span></span>`;
       }).join(' ');
 
-      function itemRow(item, slot){
-        const isEmpty=!item||item.abs.length===0;
+      // Merge builds identical except in ONE slot, so alternatives read as
+      // "Seething Sash / Stormwrath Belt" instead of near-duplicate cards. Only one
+      // slot may vary per card — otherwise the card would imply cross-combinations
+      // that were never verified.
+      const slotVal=it=>(!it||it.abs.length===0)?null:it.name;
+      function clusterBuilds(list){
+        const remaining=list.slice(), clusters=[];
+        while(remaining.length){
+          const first=remaining.shift();
+          const slots=first.gear.map(it=>[it]);
+          let varySlot=-1; const toRemove=[];
+          for(let i=0;i<remaining.length;i++){
+            const other=remaining[i];
+            let diffSlot=-1,diffCount=0;
+            for(let s=0;s<6;s++){if(slotVal(slots[s][0])!==slotVal(other.gear[s])){diffCount++;diffSlot=s;}}
+            if(diffCount!==1)continue;
+            if(varySlot!==-1&&diffSlot!==varySlot)continue;
+            varySlot=diffSlot;
+            if(!slots[diffSlot].some(it=>slotVal(it)===slotVal(other.gear[diffSlot])))slots[diffSlot].push(other.gear[diffSlot]);
+            toRemove.push(i);
+          }
+          for(let i=toRemove.length-1;i>=0;i--)remaining.splice(toRemove[i],1);
+          clusters.push(slots);
+        }
+        return clusters;
+      }
+
+      function itemRow(itemOrList, slot){
+        const list=Array.isArray(itemOrList)?itemOrList:[itemOrList];
+        const isEmpty=list.every(item=>!item||item.abs.length===0);
         const names=[];
-        if(!isEmpty){
+        list.filter(item=>item&&item.abs.length>0).forEach(item=>{
           const equiv=EQUIV_ITEMS.get(slot.id+'|'+item.name);
           (equiv||[item.name]).forEach(n=>{if(!names.includes(n))names.push(n);});
-        }
+        });
         const name=isEmpty?`Any ${slot.name}`:names.join(' / ');
         return`<div style="display:flex;align-items:center;gap:.3rem;padding:.15rem .4rem;background:${isEmpty?'#f4e8c0':'#fff'};border-radius:4px;border:1px solid #ddd;color:${isEmpty?'#888':'#222'};font-style:${isEmpty?'italic':'normal'};font-size:.72rem;min-width:0" title="${name}"><span style="font-size:.9em;flex-shrink:0">${slot.icon}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</span></div>`;
       }
 
-      const buildBoxes=builds.map(b=>{
-        const rows=SLOTS.map((slot,i)=>itemRow(b.gear[i],slot)).join('');
+      const buildBoxes=clusterBuilds(builds).map(slots=>{
+        const rows=SLOTS.map((slot,i)=>itemRow(slots[i],slot)).join('');
         return`<div style="flex:1 1 175px;min-width:165px;padding:.3rem .35rem;background:#f8f2df;border:1.5px dashed #d0c0a0;border-radius:6px;display:flex;flex-direction:column;gap:.18rem">
           ${rows}
         </div>`;
@@ -946,6 +1002,16 @@ function optimize(){
         :(b.rank===2?`\u2713 POISON CLEANSE \u2014 ${(slotLabel[b.forcedEmpty]||'').toUpperCase()}`
         :'\u221e INFINITE');
       const weaponName=key==='__any__'?'Any Weapon':key;
+      // Over 9000 frees weapon + ring, so show EVERY valid filler for the
+      // remaining slots rather than a single representative build.
+      if(b.rank===3){
+        const lean=Math.min(...over9000All.map(x=>x.abilityCount));
+        const best=over9000All.filter(x=>x.abilityCount===lean);
+        const bySet=new Map();
+        best.forEach(x=>{const k=[...x.shrineKeys].filter(Boolean).sort().join('|');
+          if(!bySet.has(k))bySet.set(k,[]);bySet.get(k).push(x);});
+        return [...bySet.values()].map(list=>renderVendingGroup(list,tier,`${weaponName} \u00b7 ${label}`)).join('');
+      }
       return renderVendingGroup([b],tier,`${weaponName} \u00b7 ${label}`);
     });
 
@@ -1072,7 +1138,7 @@ function importShrines(){
 
   // Fill gaps
   // Pad up to 8 vending machines
-  const target=8;
+  const target=9;
   for(let i=0;i<target;i++)if(!shrines[i])shrines[i]={opts:['','','']};
   const filled=shrines.filter(s=>s.opts.some(Boolean)).length;
 
